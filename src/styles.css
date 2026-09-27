@@ -131,7 +131,8 @@ button {
     background 0.15s,
     border 0.15s;
 }
-.upload-zone:hover {
+.upload-zone:hover,
+.upload-zone.drop-active {
   border-color: #f15132;
   background: #fff2ec;
 }
@@ -157,6 +158,14 @@ button {
   gap: 8px;
   padding-top: 9px;
   font-size: 11px;
+}
+.image-error {
+  color: #b42d18;
+  font-size: 12px;
+}
+.drop-active {
+  outline: 3px solid #f15132;
+  outline-offset: 3px;
 }
 .image-actions span {
   overflow: hidden;

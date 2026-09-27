@@ -16,6 +16,8 @@ const exportSize = ref('A5')
 const exportDpi = ref(300)
 const isDragging = ref(false)
 const isExporting = ref(false)
+const dropTarget = ref(null)
+const imageError = ref('')
 let objectUrl = null
 let dragStart = null
 
@@ -65,6 +67,8 @@ watch(
 onMounted(() => {
   renderPreview()
   window.addEventListener('resize', renderPreview)
+  window.addEventListener('dragover', preventFileNavigation)
+  window.addEventListener('drop', preventFileNavigation)
 })
 
 function chooseImage() {
@@ -72,19 +76,67 @@ function chooseImage() {
 }
 function onFileChange(event) {
   const file = event.target.files?.[0]
-  if (!file || !file.type.startsWith('image/')) return
+  loadImage(file)
+  event.target.value = ''
+}
+function loadImage(file) {
+  if (!file) return
+  imageError.value = ''
+  if (file.type && !file.type.startsWith('image/')) {
+    imageError.value = '画像ファイルを選択してください。'
+    return
+  }
   if (objectUrl) URL.revokeObjectURL(objectUrl)
-  objectUrl = URL.createObjectURL(file)
+  const url = URL.createObjectURL(file)
+  objectUrl = url
   const image = new Image()
   image.onload = () => {
+    if (objectUrl !== url) return
+    URL.revokeObjectURL(url)
+    objectUrl = null
     artwork.value = image
     artworkName.value = file.name
-    imageZoom.value = 100
-    imageX.value = 0
-    imageY.value = 0
+    imageError.value = ''
+    resetImage()
     renderPreview()
   }
-  image.src = objectUrl
+  image.onerror = () => {
+    if (objectUrl !== url) return
+    URL.revokeObjectURL(url)
+    objectUrl = null
+    imageError.value =
+      '画像を読み込めませんでした。JPG・PNG・WebPなどの画像を選択してください。'
+  }
+  image.src = url
+}
+function preventFileNavigation(event) {
+  if (!Array.from(event.dataTransfer?.types ?? []).includes('Files')) return
+  event.preventDefault()
+  if (event.type === 'dragover') event.dataTransfer.dropEffect = 'none'
+  else dropTarget.value = null
+}
+function onDragOver(event, target) {
+  if (!Array.from(event.dataTransfer?.types ?? []).includes('Files')) return
+  event.preventDefault()
+  event.stopPropagation()
+  event.dataTransfer.dropEffect = 'copy'
+  dropTarget.value = target
+}
+function onDragLeave(event) {
+  if (!event.currentTarget.contains(event.relatedTarget))
+    dropTarget.value = null
+}
+function onDrop(event) {
+  event.preventDefault()
+  event.stopPropagation()
+  dropTarget.value = null
+  const files = event.dataTransfer?.files
+  if (!files?.length) return
+  if (files.length > 1) {
+    imageError.value = '画像は1枚ずつドロップしてください。'
+    return
+  }
+  loadImage(files[0])
 }
 function resetImage() {
   imageZoom.value = 100
@@ -158,7 +210,10 @@ async function exportPng() {
 }
 onBeforeUnmount(() => {
   if (objectUrl) URL.revokeObjectURL(objectUrl)
+  objectUrl = null
   window.removeEventListener('resize', renderPreview)
+  window.removeEventListener('dragover', preventFileNavigation)
+  window.removeEventListener('drop', preventFileNavigation)
 })
 </script>
 
@@ -182,17 +237,28 @@ onBeforeUnmount(() => {
             accept="image/*"
             @change="onFileChange"
           />
-          <button class="upload-zone" @click="chooseImage">
+          <button
+            class="upload-zone"
+            :class="{ 'drop-active': dropTarget === 'upload' }"
+            @click="chooseImage"
+            @dragover="onDragOver($event, 'upload')"
+            @dragleave="onDragLeave"
+            @drop="onDrop"
+          >
             <span class="upload-icon">↥</span
             ><strong>{{
               artwork ? '画像を差し替える' : '画像をアップロード'
             }}</strong
             ><small>{{ artwork ? artworkName : 'JPG / PNG / WebP' }}</small>
+            <small>画像をドラッグ＆ドロップ、またはクリック</small>
           </button>
           <div v-if="artwork" class="image-actions">
             <span>{{ artworkName }}</span
             ><button @click="resetImage">位置を戻す</button>
           </div>
+          <p v-if="imageError" class="image-error" role="alert">
+            {{ imageError }}
+          </p>
         </section>
         <section class="panel">
           <div class="section-label"><span>02</span> レイアウト</div>
@@ -271,7 +337,13 @@ onBeforeUnmount(() => {
           <span>PAGE {{ String(pageNumber).padStart(2, '0') }}</span
           ><span>{{ selectedTemplate.name }}</span>
         </div>
-        <div class="preview-wrap">
+        <div
+          class="preview-wrap"
+          :class="{ 'drop-active': dropTarget === 'preview' }"
+          @dragover="onDragOver($event, 'preview')"
+          @dragleave="onDragLeave"
+          @drop="onDrop"
+        >
           <canvas
             ref="previewCanvas"
             class="page-canvas"
@@ -284,7 +356,7 @@ onBeforeUnmount(() => {
           <div v-if="!artwork" class="empty-state">
             <div>＋</div>
             <strong>ここに作品画像を置く</strong
-            ><span>アップロード後、ドラッグで位置を調整できます</span
+            ><span>画像をドラッグ＆ドロップして読み込めます</span
             ><button @click="chooseImage">画像を選ぶ</button>
           </div>
         </div>
