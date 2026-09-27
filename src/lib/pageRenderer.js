@@ -5,10 +5,34 @@ export const paperSizes = {
 }
 
 export const templates = [
-  { id: 'calendar', name: '作品カレンダー', art: { x: 10.5, y: 20, w: 79, h: 57 }, date: true, number: 'bottom' },
-  { id: 'gallery', name: '余白ギャラリー', art: { x: 13, y: 12, w: 74, h: 68 }, date: false, number: 'bottom' },
-  { id: 'bleed', name: 'フルブリード', art: { x: 0, y: 0, w: 100, h: 100 }, date: false, number: 'over' },
-  { id: 'postcard', name: 'ポストカード', art: { x: 10, y: 16, w: 80, h: 56 }, date: true, number: 'bottom' },
+  {
+    id: 'calendar',
+    name: '作品カレンダー',
+    art: { x: 10.5, y: 20, w: 79, h: 57 },
+    date: true,
+    number: 'bottom',
+  },
+  {
+    id: 'gallery',
+    name: '余白ギャラリー',
+    art: { x: 13, y: 12, w: 74, h: 68 },
+    date: false,
+    number: 'bottom',
+  },
+  {
+    id: 'bleed',
+    name: 'フルブリード',
+    art: { x: 0, y: 0, w: 100, h: 100 },
+    date: false,
+    number: 'over',
+  },
+  {
+    id: 'postcard',
+    name: 'ポストカード',
+    art: { x: 10, y: 16, w: 80, h: 56 },
+    date: true,
+    number: 'bottom',
+  },
 ]
 
 function fitText(ctx, text, maxWidth, initial) {
@@ -23,7 +47,12 @@ function fitText(ctx, text, maxWidth, initial) {
 
 function drawImageCover(ctx, image, frame, zoom, offsetX, offsetY) {
   if (!image) {
-    const gradient = ctx.createLinearGradient(frame.x, frame.y, frame.x + frame.w, frame.y + frame.h)
+    const gradient = ctx.createLinearGradient(
+      frame.x,
+      frame.y,
+      frame.x + frame.w,
+      frame.y + frame.h,
+    )
     gradient.addColorStop(0, '#e7e3d9')
     gradient.addColorStop(1, '#d6d1c4')
     ctx.fillStyle = gradient
@@ -38,7 +67,13 @@ function drawImageCover(ctx, image, frame, zoom, offsetX, offsetY) {
   const imageRatio = image.naturalWidth / image.naturalHeight
   const frameRatio = frame.w / frame.h
   let width, height
-  if (imageRatio > frameRatio) { height = frame.h * zoom; width = height * imageRatio } else { width = frame.w * zoom; height = width / imageRatio }
+  if (imageRatio > frameRatio) {
+    height = frame.h * zoom
+    width = height * imageRatio
+  } else {
+    width = frame.w * zoom
+    height = width / imageRatio
+  }
   const xRange = Math.max(0, width - frame.w) / 2
   const yRange = Math.max(0, height - frame.h) / 2
   const x = frame.x + (frame.w - width) / 2 - xRange * (offsetX / 100)
@@ -52,9 +87,23 @@ function drawImageCover(ctx, image, frame, zoom, offsetX, offsetY) {
 }
 
 export function drawPage(ctx, width, height, options) {
-  const { template, image, pageNumber, printedDate, zoom, offsetX, offsetY, showGuide } = options
+  const {
+    template,
+    image,
+    pageNumber,
+    printedDate,
+    zoom,
+    offsetX,
+    offsetY,
+    showGuide,
+  } = options
   const u = width / 100
-  const frame = { x: template.art.x * u, y: template.art.y * u, w: template.art.w * u, h: template.art.h * u }
+  const frame = {
+    x: template.art.x * u,
+    y: template.art.y * u,
+    w: template.art.w * u,
+    h: template.art.h * u,
+  }
   ctx.clearRect(0, 0, width, height)
   ctx.fillStyle = template.id === 'bleed' ? '#171716' : '#fffefa'
   ctx.fillRect(0, 0, width, height)
@@ -77,10 +126,18 @@ export function drawPage(ctx, width, height, options) {
     const y = height * 0.815
     ctx.strokeStyle = '#33332f'
     ctx.lineWidth = Math.max(1, u * 0.15)
-    ctx.beginPath(); ctx.moveTo(x, y - u * 5.5); ctx.lineTo(x, y + u * 4.5); ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(x, y - u * 5.5)
+    ctx.lineTo(x, y + u * 4.5)
+    ctx.stroke()
     ctx.fillStyle = '#292926'
     ctx.textAlign = 'left'
-    const numberSize = fitText(ctx, String(pageNumber).padStart(2, '0'), width * 0.18, u * 3.1)
+    const numberSize = fitText(
+      ctx,
+      String(pageNumber).padStart(2, '0'),
+      width * 0.18,
+      u * 3.1,
+    )
     ctx.font = `700 ${numberSize}px 'DM Mono', monospace`
     ctx.fillText(String(pageNumber).padStart(2, '0'), x + u * 1.8, y - u * 1.8)
     ctx.font = `400 ${u * 1.65}px 'DM Mono', monospace`
@@ -97,13 +154,17 @@ export function drawPage(ctx, width, height, options) {
     ctx.fillStyle = '#fffefa'
     ctx.textAlign = 'right'
     ctx.font = `700 ${u * 2.1}px 'DM Mono', monospace`
-    ctx.fillText(String(pageNumber).padStart(2, '0'), width - u * 5, height - u * 4.5)
+    ctx.fillText(
+      String(pageNumber).padStart(2, '0'),
+      width - u * 5,
+      height - u * 4.5,
+    )
   }
   if (showGuide && image) {
     ctx.save()
     ctx.strokeStyle = 'rgba(255, 89, 51, .85)'
-    ctx.setLineDash([u * 1, u * .7])
-    ctx.lineWidth = Math.max(1, u * .15)
+    ctx.setLineDash([u * 1, u * 0.7])
+    ctx.lineWidth = Math.max(1, u * 0.15)
     ctx.strokeRect(frame.x, frame.y, frame.w, frame.h)
     ctx.restore()
   }
