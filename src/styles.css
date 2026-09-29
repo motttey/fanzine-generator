@@ -327,6 +327,15 @@ select {
   font-family: 'DM Mono', monospace;
   font-size: 12px;
 }
+.reset-text {
+  margin-top: 12px;
+  padding: 0;
+  border: 0;
+  color: #626057;
+  background: transparent;
+  text-decoration: underline;
+  font-size: 11px;
+}
 .select-row {
   display: grid;
   grid-template-columns: 1fr 82px;

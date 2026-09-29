@@ -86,6 +86,55 @@ function drawImageCover(ctx, image, frame, zoom, offsetX, offsetY) {
   ctx.restore()
 }
 
+function drawText(
+  ctx,
+  regions,
+  id,
+  text,
+  x,
+  y,
+  font,
+  align,
+  color,
+  offset,
+  page,
+) {
+  ctx.font = font
+  ctx.textAlign = align
+  ctx.fillStyle = color
+  const shiftedX = x + ((offset?.x ?? 0) * page.width) / 100
+  const shiftedY = y + ((offset?.y ?? 0) * page.height) / 100
+  ctx.fillText(text, shiftedX, shiftedY)
+
+  const metrics = ctx.measureText(text)
+  const fontSize = Number.parseFloat(font.match(/[\d.]+px/)?.[0]) || 12
+  const ascent = metrics.actualBoundingBoxAscent || fontSize * 0.8
+  const descent = metrics.actualBoundingBoxDescent || fontSize * 0.2
+  const left =
+    align === 'center'
+      ? shiftedX - metrics.width / 2
+      : align === 'right'
+        ? shiftedX - metrics.width
+        : shiftedX
+  const bounds = {
+    x: left,
+    y: shiftedY - ascent,
+    width: metrics.width,
+    height: ascent + descent,
+  }
+  const padding = Math.max(5, fontSize * 0.65)
+  regions.push({
+    id,
+    bounds,
+    hit: {
+      x: left - padding,
+      y: bounds.y - padding,
+      width: Math.max(metrics.width, 8) + padding * 2,
+      height: bounds.height + padding * 2,
+    },
+  })
+}
+
 export function drawPage(ctx, width, height, options) {
   const {
     template,
@@ -96,6 +145,8 @@ export function drawPage(ctx, width, height, options) {
     offsetX,
     offsetY,
     showGuide,
+    textOffsets = {},
+    activeTextId,
   } = options
   const u = width / 100
   const frame = {
@@ -108,6 +159,8 @@ export function drawPage(ctx, width, height, options) {
   ctx.fillStyle = template.id === 'bleed' ? '#171716' : '#fffefa'
   ctx.fillRect(0, 0, width, height)
   drawImageCover(ctx, image, frame, zoom, offsetX, offsetY)
+  const textRegions = []
+  const page = { width, height }
 
   if (template.id !== 'bleed') {
     ctx.strokeStyle = '#1e1e1b'
@@ -130,35 +183,85 @@ export function drawPage(ctx, width, height, options) {
     ctx.moveTo(x, y - u * 5.5)
     ctx.lineTo(x, y + u * 4.5)
     ctx.stroke()
-    ctx.fillStyle = '#292926'
-    ctx.textAlign = 'left'
     const numberSize = fitText(
       ctx,
       String(pageNumber).padStart(2, '0'),
       width * 0.18,
       u * 3.1,
     )
-    ctx.font = `700 ${numberSize}px 'DM Mono', monospace`
-    ctx.fillText(String(pageNumber).padStart(2, '0'), x + u * 1.8, y - u * 1.8)
-    ctx.font = `400 ${u * 1.65}px 'DM Mono', monospace`
-    ctx.fillText(printedDate || 'YYYY-MM-DD', x + u * 1.8, y + u * 2)
+    drawText(
+      ctx,
+      textRegions,
+      'dateNumber',
+      String(pageNumber).padStart(2, '0'),
+      x + u * 1.8,
+      y - u * 1.8,
+      `700 ${numberSize}px 'DM Mono', monospace`,
+      'left',
+      '#292926',
+      textOffsets.dateNumber,
+      page,
+    )
+    drawText(
+      ctx,
+      textRegions,
+      'date',
+      printedDate || 'YYYY-MM-DD',
+      x + u * 1.8,
+      y + u * 2,
+      `400 ${u * 1.65}px 'DM Mono', monospace`,
+      'left',
+      '#292926',
+      textOffsets.date,
+      page,
+    )
   }
 
   if (template.number === 'bottom') {
-    ctx.fillStyle = '#20201e'
-    ctx.textAlign = 'center'
-    ctx.font = `700 ${u * 2.1}px 'DM Mono', monospace`
-    ctx.fillText(pageNumber, width / 2, height - u * 4.2)
+    drawText(
+      ctx,
+      textRegions,
+      'footerNumber',
+      String(pageNumber),
+      width / 2,
+      height - u * 4.2,
+      `700 ${u * 2.1}px 'DM Mono', monospace`,
+      'center',
+      '#20201e',
+      textOffsets.footerNumber,
+      page,
+    )
   }
   if (template.number === 'over') {
-    ctx.fillStyle = '#fffefa'
-    ctx.textAlign = 'right'
-    ctx.font = `700 ${u * 2.1}px 'DM Mono', monospace`
-    ctx.fillText(
+    drawText(
+      ctx,
+      textRegions,
+      'overNumber',
       String(pageNumber).padStart(2, '0'),
       width - u * 5,
       height - u * 4.5,
+      `700 ${u * 2.1}px 'DM Mono', monospace`,
+      'right',
+      '#fffefa',
+      textOffsets.overNumber,
+      page,
     )
+  }
+  if (showGuide && activeTextId) {
+    const region = textRegions.find((item) => item.id === activeTextId)
+    if (region) {
+      ctx.save()
+      ctx.strokeStyle = '#f15132'
+      ctx.lineWidth = Math.max(1, u * 0.2)
+      ctx.setLineDash([u * 0.6, u * 0.45])
+      ctx.strokeRect(
+        region.hit.x,
+        region.hit.y,
+        region.hit.width,
+        region.hit.height,
+      )
+      ctx.restore()
+    }
   }
   if (showGuide && image) {
     ctx.save()
@@ -168,4 +271,5 @@ export function drawPage(ctx, width, height, options) {
     ctx.strokeRect(frame.x, frame.y, frame.w, frame.h)
     ctx.restore()
   }
+  return textRegions
 }

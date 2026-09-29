@@ -15,31 +15,42 @@ const imageY = ref(0)
 const exportSize = ref('A5')
 const exportDpi = ref(300)
 const isDragging = ref(false)
+const draggingText = ref(null)
+const hoveredText = ref(null)
+const textOffsets = ref({})
 const isExporting = ref(false)
 const dropTarget = ref(null)
 const imageError = ref('')
 let objectUrl = null
 let dragStart = null
+let textRegions = []
+let previewWidth = 0
+let previewHeight = 0
 
 const selectedTemplate = computed(() =>
   templates.find((template) => template.id === activeTemplate.value),
 )
 const selectedPaper = computed(() => paperSizes[exportSize.value])
+const currentTextOffsets = computed(
+  () => textOffsets.value[activeTemplate.value] ?? {},
+)
 
 function renderPreview() {
   const canvas = previewCanvas.value
   if (!canvas) return
   const bounds = canvas.getBoundingClientRect()
   const ratio = selectedPaper.value.height / selectedPaper.value.width
-  const displayWidth = Math.min(Math.max(bounds.width || 480, 320), 620)
+  const displayWidth = bounds.width || 480
   const displayHeight = displayWidth * ratio
+  previewWidth = displayWidth
+  previewHeight = displayHeight
   const dpr = window.devicePixelRatio || 1
   canvas.width = Math.round(displayWidth * dpr)
   canvas.height = Math.round(displayHeight * dpr)
   canvas.style.aspectRatio = `${selectedPaper.value.width} / ${selectedPaper.value.height}`
   const context = canvas.getContext('2d')
   context.scale(dpr, dpr)
-  drawPage(context, displayWidth, displayHeight, {
+  textRegions = drawPage(context, displayWidth, displayHeight, {
     template: selectedTemplate.value,
     image: artwork.value,
     pageNumber: pageNumber.value,
@@ -48,6 +59,8 @@ function renderPreview() {
     offsetX: imageX.value,
     offsetY: imageY.value,
     showGuide: true,
+    textOffsets: currentTextOffsets.value,
+    activeTextId: draggingText.value || hoveredText.value,
   })
 }
 
@@ -61,6 +74,9 @@ watch(
     imageY,
     exportSize,
     artwork,
+    textOffsets,
+    draggingText,
+    hoveredText,
   ],
   () => nextTick(renderPreview),
 )
@@ -143,20 +159,86 @@ function resetImage() {
   imageX.value = 0
   imageY.value = 0
 }
+function resetTextPositions() {
+  const next = { ...textOffsets.value }
+  delete next[activeTemplate.value]
+  textOffsets.value = next
+}
+function textAtPointer(event) {
+  const rect = event.currentTarget.getBoundingClientRect()
+  if (!rect.width || !rect.height) return null
+  const x = ((event.clientX - rect.left) * previewWidth) / rect.width
+  const y = ((event.clientY - rect.top) * previewHeight) / rect.height
+  return (
+    [...textRegions]
+      .reverse()
+      .find(
+        ({ hit }) =>
+          x >= hit.x &&
+          x <= hit.x + hit.width &&
+          y >= hit.y &&
+          y <= hit.y + hit.height,
+      ) ?? null
+  )
+}
 function pointerDown(event) {
-  if (!artwork.value) return
+  const textRegion = textAtPointer(event)
+  if (!textRegion && !artwork.value) return
   isDragging.value = true
-  dragStart = {
-    x: event.clientX,
-    y: event.clientY,
-    offsetX: imageX.value,
-    offsetY: imageY.value,
+  if (textRegion) {
+    draggingText.value = textRegion.id
+    hoveredText.value = textRegion.id
+    dragStart = {
+      type: 'text',
+      id: textRegion.id,
+      x: event.clientX,
+      y: event.clientY,
+      offset: currentTextOffsets.value[textRegion.id] ?? { x: 0, y: 0 },
+      bounds: textRegion.bounds,
+    }
+  } else {
+    dragStart = {
+      type: 'image',
+      x: event.clientX,
+      y: event.clientY,
+      offsetX: imageX.value,
+      offsetY: imageY.value,
+    }
   }
   event.currentTarget.setPointerCapture(event.pointerId)
 }
 function pointerMove(event) {
-  if (!isDragging.value || !dragStart) return
+  if (!dragStart) {
+    hoveredText.value = textAtPointer(event)?.id ?? null
+    return
+  }
   const rect = event.currentTarget.getBoundingClientRect()
+  if (dragStart.type === 'text') {
+    const dx = ((event.clientX - dragStart.x) / rect.width) * previewWidth
+    const dy = ((event.clientY - dragStart.y) / rect.height) * previewHeight
+    const { bounds, offset, id } = dragStart
+    const pageWidth = previewWidth
+    const pageHeight = previewHeight
+    const limitedX = Math.max(
+      -bounds.x,
+      Math.min(pageWidth - bounds.x - bounds.width, dx),
+    )
+    const limitedY = Math.max(
+      -bounds.y,
+      Math.min(pageHeight - bounds.y - bounds.height, dy),
+    )
+    textOffsets.value = {
+      ...textOffsets.value,
+      [activeTemplate.value]: {
+        ...currentTextOffsets.value,
+        [id]: {
+          x: offset.x + (limitedX / pageWidth) * 100,
+          y: offset.y + (limitedY / pageHeight) * 100,
+        },
+      },
+    }
+    return
+  }
   imageX.value = Math.max(
     -100,
     Math.min(
@@ -174,6 +256,7 @@ function pointerMove(event) {
 }
 function pointerUp(event) {
   isDragging.value = false
+  draggingText.value = null
   dragStart = null
   if (event.currentTarget.hasPointerCapture(event.pointerId))
     event.currentTarget.releasePointerCapture(event.pointerId)
@@ -201,6 +284,7 @@ async function exportPng() {
     offsetX: imageX.value,
     offsetY: imageY.value,
     showGuide: false,
+    textOffsets: currentTextOffsets.value,
   })
   const link = document.createElement('a')
   link.download = `doujin-page-${exportSize.value.toLowerCase()}-${exportDpi.value}dpi.png`
@@ -306,6 +390,9 @@ onBeforeUnmount(() => {
               type="text"
               placeholder="YYYY-MM-DD"
           /></label>
+          <button class="reset-text" @click="resetTextPositions">
+            文字の位置を戻す
+          </button>
         </section>
         <section class="panel export-settings">
           <div class="section-label"><span>05</span> 書き出し設定</div>
@@ -347,11 +434,12 @@ onBeforeUnmount(() => {
           <canvas
             ref="previewCanvas"
             class="page-canvas"
-            :class="{ draggable: artwork, dragging: isDragging }"
+            :class="{ draggable: artwork || hoveredText, dragging: isDragging }"
             @pointerdown="pointerDown"
             @pointermove="pointerMove"
             @pointerup="pointerUp"
             @pointercancel="pointerUp"
+            @pointerleave="hoveredText = null"
           ></canvas>
           <div v-if="!artwork" class="empty-state">
             <div>＋</div>
@@ -363,8 +451,8 @@ onBeforeUnmount(() => {
         <p class="drag-hint">
           {{
             artwork
-              ? 'プレビュー上をドラッグして、画像の見せる位置を調整できます。'
-              : 'テンプレートを選んでから作品画像をアップロードしてください。'
+              ? '文字をドラッグして配置、文字以外をドラッグして画像の位置を調整できます。'
+              : '文字をドラッグして配置できます。作品画像もアップロードできます。'
           }}
         </p>
       </section>
