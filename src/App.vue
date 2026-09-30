@@ -7,6 +7,7 @@ const fileInput = ref(null)
 const artwork = ref(null)
 const artworkName = ref('画像をアップロード')
 const activeTemplate = ref('calendar')
+const backgroundColors = ref({})
 const pageNumber = ref(23)
 const printedDate = ref('2022-09-25')
 const imageZoom = ref(100)
@@ -30,6 +31,17 @@ let previewHeight = 0
 const selectedTemplate = computed(() =>
   templates.find((template) => template.id === activeTemplate.value),
 )
+const selectedBackgroundColor = computed({
+  get: () =>
+    backgroundColors.value[activeTemplate.value] ??
+    selectedTemplate.value.backgroundColor,
+  set: (color) => {
+    backgroundColors.value = {
+      ...backgroundColors.value,
+      [activeTemplate.value]: color,
+    }
+  },
+})
 const selectedPaper = computed(() => paperSizes[exportSize.value])
 const currentTextOffsets = computed(
   () => textOffsets.value[activeTemplate.value] ?? {},
@@ -52,6 +64,7 @@ function renderPreview() {
   context.scale(dpr, dpr)
   textRegions = drawPage(context, displayWidth, displayHeight, {
     template: selectedTemplate.value,
+    backgroundColor: selectedBackgroundColor.value,
     image: artwork.value,
     pageNumber: pageNumber.value,
     printedDate: printedDate.value,
@@ -67,6 +80,7 @@ function renderPreview() {
 watch(
   [
     activeTemplate,
+    backgroundColors,
     pageNumber,
     printedDate,
     imageZoom,
@@ -277,6 +291,7 @@ async function exportPng() {
   canvas.height = size.height
   drawPage(canvas.getContext('2d'), size.width, size.height, {
     template: selectedTemplate.value,
+    backgroundColor: selectedBackgroundColor.value,
     image: artwork.value,
     pageNumber: pageNumber.value,
     printedDate: printedDate.value,
@@ -359,6 +374,11 @@ onBeforeUnmount(() => {
               ><strong>{{ template.name }}</strong>
             </button>
           </div>
+          <label class="background-color-control">
+            <span>背景色</span>
+            <input v-model="selectedBackgroundColor" type="color" />
+            <output>{{ selectedBackgroundColor.toUpperCase() }}</output>
+          </label>
         </section>
         <section class="panel controls">
           <div class="section-label"><span>03</span> 調整</div>

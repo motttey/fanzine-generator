@@ -8,6 +8,7 @@ export const templates = [
   {
     id: 'calendar',
     name: '作品カレンダー',
+    backgroundColor: '#fffefa',
     art: { x: 10.5, y: 20, w: 79, h: 57 },
     date: true,
     number: 'bottom',
@@ -15,6 +16,7 @@ export const templates = [
   {
     id: 'gallery',
     name: '余白ギャラリー',
+    backgroundColor: '#fffefa',
     art: { x: 13, y: 12, w: 74, h: 68 },
     date: false,
     number: 'bottom',
@@ -22,6 +24,7 @@ export const templates = [
   {
     id: 'bleed',
     name: 'フルブリード',
+    backgroundColor: '#ffffff',
     art: { x: 0, y: 0, w: 100, h: 100 },
     date: false,
     number: 'over',
@@ -29,6 +32,7 @@ export const templates = [
   {
     id: 'postcard',
     name: 'ポストカード',
+    backgroundColor: '#fffefa',
     art: { x: 10, y: 16, w: 80, h: 56 },
     date: true,
     number: 'bottom',
@@ -138,6 +142,7 @@ function drawText(
 export function drawPage(ctx, width, height, options) {
   const {
     template,
+    backgroundColor = template.backgroundColor,
     image,
     pageNumber,
     printedDate,
@@ -149,6 +154,11 @@ export function drawPage(ctx, width, height, options) {
     activeTextId,
   } = options
   const u = width / 100
+  const red = Number.parseInt(backgroundColor.slice(1, 3), 16)
+  const green = Number.parseInt(backgroundColor.slice(3, 5), 16)
+  const blue = Number.parseInt(backgroundColor.slice(5, 7), 16)
+  const backgroundBrightness = red * 0.299 + green * 0.587 + blue * 0.114
+  const lightInk = backgroundBrightness < 150
   const frame = {
     x: template.art.x * u,
     y: template.art.y * u,
@@ -156,17 +166,19 @@ export function drawPage(ctx, width, height, options) {
     h: template.art.h * u,
   }
   ctx.clearRect(0, 0, width, height)
-  ctx.fillStyle = template.id === 'bleed' ? '#171716' : '#fffefa'
+  ctx.fillStyle = backgroundColor
   ctx.fillRect(0, 0, width, height)
-  drawImageCover(ctx, image, frame, zoom, offsetX, offsetY)
+  if (image || template.id !== 'bleed') {
+    drawImageCover(ctx, image, frame, zoom, offsetX, offsetY)
+  }
   const textRegions = []
   const page = { width, height }
 
   if (template.id !== 'bleed') {
-    ctx.strokeStyle = '#1e1e1b'
+    ctx.strokeStyle = lightInk ? '#fffefa' : '#1e1e1b'
     ctx.lineWidth = Math.max(1, u * 0.13)
     ctx.strokeRect(frame.x, frame.y, frame.w, frame.h)
-  } else {
+  } else if (image) {
     const shade = ctx.createLinearGradient(0, 0, 0, height)
     shade.addColorStop(0.6, 'transparent')
     shade.addColorStop(1, 'rgba(0,0,0,.55)')
@@ -177,7 +189,7 @@ export function drawPage(ctx, width, height, options) {
   if (template.date) {
     const x = width * 0.75
     const y = height * 0.815
-    ctx.strokeStyle = '#33332f'
+    ctx.strokeStyle = lightInk ? '#fffefa' : '#33332f'
     ctx.lineWidth = Math.max(1, u * 0.15)
     ctx.beginPath()
     ctx.moveTo(x, y - u * 5.5)
@@ -198,7 +210,7 @@ export function drawPage(ctx, width, height, options) {
       y - u * 1.8,
       `700 ${numberSize}px 'DM Mono', monospace`,
       'left',
-      '#292926',
+      lightInk ? '#fffefa' : '#292926',
       textOffsets.dateNumber,
       page,
     )
@@ -211,7 +223,7 @@ export function drawPage(ctx, width, height, options) {
       y + u * 2,
       `400 ${u * 1.65}px 'DM Mono', monospace`,
       'left',
-      '#292926',
+      lightInk ? '#fffefa' : '#292926',
       textOffsets.date,
       page,
     )
@@ -227,7 +239,7 @@ export function drawPage(ctx, width, height, options) {
       height - u * 4.2,
       `700 ${u * 2.1}px 'DM Mono', monospace`,
       'center',
-      '#20201e',
+      lightInk ? '#fffefa' : '#20201e',
       textOffsets.footerNumber,
       page,
     )
@@ -242,7 +254,7 @@ export function drawPage(ctx, width, height, options) {
       height - u * 4.5,
       `700 ${u * 2.1}px 'DM Mono', monospace`,
       'right',
-      '#fffefa',
+      image || lightInk ? '#fffefa' : '#20201e',
       textOffsets.overNumber,
       page,
     )
