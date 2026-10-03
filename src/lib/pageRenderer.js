@@ -189,11 +189,15 @@ export function drawPage(ctx, width, height, options) {
   if (template.date) {
     const x = width * 0.75
     const y = height * 0.815
+    const dateOffset = textOffsets.dateBlock
+    const lineX = x + ((dateOffset?.x ?? 0) * width) / 100
+    const lineY = y + ((dateOffset?.y ?? 0) * height) / 100
+    const dateRegions = []
     ctx.strokeStyle = lightInk ? '#fffefa' : '#33332f'
     ctx.lineWidth = Math.max(1, u * 0.15)
     ctx.beginPath()
-    ctx.moveTo(x, y - u * 5.5)
-    ctx.lineTo(x, y + u * 4.5)
+    ctx.moveTo(lineX, lineY - u * 5.5)
+    ctx.lineTo(lineX, lineY + u * 4.5)
     ctx.stroke()
     const numberSize = fitText(
       ctx,
@@ -203,7 +207,7 @@ export function drawPage(ctx, width, height, options) {
     )
     drawText(
       ctx,
-      textRegions,
+      dateRegions,
       'dateNumber',
       String(pageNumber).padStart(2, '0'),
       x + u * 1.8,
@@ -211,12 +215,12 @@ export function drawPage(ctx, width, height, options) {
       `700 ${numberSize}px 'DM Mono', monospace`,
       'left',
       lightInk ? '#fffefa' : '#292926',
-      textOffsets.dateNumber,
+      dateOffset,
       page,
     )
     drawText(
       ctx,
-      textRegions,
+      dateRegions,
       'date',
       printedDate || 'YYYY-MM-DD',
       x + u * 1.8,
@@ -224,9 +228,40 @@ export function drawPage(ctx, width, height, options) {
       `400 ${u * 1.65}px 'DM Mono', monospace`,
       'left',
       lightInk ? '#fffefa' : '#292926',
-      textOffsets.date,
+      dateOffset,
       page,
     )
+    const linePadding = Math.max(5, u * 2)
+    const hitRects = [
+      ...dateRegions.map((region) => region.hit),
+      {
+        x: lineX - linePadding,
+        y: lineY - u * 5.5 - linePadding,
+        width: linePadding * 2,
+        height: u * 10 + linePadding * 2,
+      },
+    ]
+    const bounds = [
+      ...dateRegions.map((region) => region.bounds),
+      {
+        x: lineX - ctx.lineWidth / 2,
+        y: lineY - u * 5.5,
+        width: ctx.lineWidth,
+        height: u * 10,
+      },
+    ]
+    const enclosingRect = (rects) => {
+      const left = Math.min(...rects.map((rect) => rect.x))
+      const top = Math.min(...rects.map((rect) => rect.y))
+      const right = Math.max(...rects.map((rect) => rect.x + rect.width))
+      const bottom = Math.max(...rects.map((rect) => rect.y + rect.height))
+      return { x: left, y: top, width: right - left, height: bottom - top }
+    }
+    textRegions.push({
+      id: 'dateBlock',
+      bounds: enclosingRect(bounds),
+      hit: enclosingRect(hitRects),
+    })
   }
 
   if (template.number === 'bottom') {

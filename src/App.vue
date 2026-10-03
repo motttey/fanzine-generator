@@ -410,7 +410,7 @@ onBeforeUnmount(() => {
               placeholder="YYYY-MM-DD"
           /></label>
           <button class="reset-text" @click="resetTextPositions">
-            文字の位置を戻す
+            要素の位置を戻す
           </button>
         </section>
         <section class="panel export-settings">
@@ -470,8 +470,8 @@ onBeforeUnmount(() => {
         <p class="drag-hint">
           {{
             artwork
-              ? '文字をドラッグして配置、文字以外をドラッグして画像の位置を調整できます。'
-              : '文字をドラッグして配置できます。作品画像もアップロードできます。'
+              ? '文字や日付の線をドラッグして配置、その他の場所をドラッグして画像の位置を調整できます。'
+              : '文字や日付の線をドラッグして配置できます。作品画像もアップロードできます。'
           }}
         </p>
       </section>
