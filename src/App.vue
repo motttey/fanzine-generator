@@ -1,5 +1,18 @@
-<script setup>
+<script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import type {
+  ArtFrame,
+  ArtOffsetsByTemplate,
+  BackgroundColors,
+  CanvasPoint,
+  DragStart,
+  DropTarget,
+  LayoutElementId,
+  PaperSizeId,
+  TemplateId,
+  TextOffsetsByTemplate,
+  TextRegion,
+} from './@types/generator'
 import {
   drawPage,
   getArtFrame,
@@ -7,36 +20,38 @@ import {
   templates,
 } from './lib/pageRenderer'
 
-const previewCanvas = ref(null)
-const fileInput = ref(null)
-const artwork = ref(null)
+const previewCanvas = ref<HTMLCanvasElement | null>(null)
+const fileInput = ref<HTMLInputElement | null>(null)
+const artwork = ref<HTMLImageElement | null>(null)
 const artworkName = ref('画像をアップロード')
-const activeTemplate = ref('calendar')
-const backgroundColors = ref({})
+const activeTemplate = ref<TemplateId>('calendar')
+const backgroundColors = ref<BackgroundColors>({})
 const pageNumber = ref(23)
 const printedDate = ref('2022-09-25')
 const imageZoom = ref(100)
 const imageX = ref(0)
 const imageY = ref(0)
-const exportSize = ref('A5')
+const exportSize = ref<PaperSizeId>('A5')
 const exportDpi = ref(300)
 const isDragging = ref(false)
-const draggingText = ref(null)
-const hoveredText = ref(null)
+const draggingText = ref<LayoutElementId | null>(null)
+const hoveredText = ref<LayoutElementId | null>(null)
 const hoveredArtFrame = ref(false)
-const textOffsets = ref({})
-const artOffsets = ref({})
+const textOffsets = ref<TextOffsetsByTemplate>({})
+const artOffsets = ref<ArtOffsetsByTemplate>({})
 const isExporting = ref(false)
-const dropTarget = ref(null)
+const dropTarget = ref<DropTarget | null>(null)
 const imageError = ref('')
-let objectUrl = null
-let dragStart = null
-let textRegions = []
+let objectUrl: string | null = null
+let dragStart: DragStart | null = null
+let textRegions: TextRegion[] = []
 let previewWidth = 0
 let previewHeight = 0
 
-const selectedTemplate = computed(() =>
-  templates.find((template) => template.id === activeTemplate.value),
+const selectedTemplate = computed(
+  () =>
+    templates.find((template) => template.id === activeTemplate.value) ??
+    templates[0],
 )
 const selectedBackgroundColor = computed({
   get: () =>
@@ -71,6 +86,7 @@ function renderPreview() {
   canvas.height = Math.round(displayHeight * dpr)
   canvas.style.aspectRatio = `${selectedPaper.value.width} / ${selectedPaper.value.height}`
   const context = canvas.getContext('2d')
+  if (!context) return
   context.scale(dpr, dpr)
   textRegions = drawPage(context, displayWidth, displayHeight, {
     template: selectedTemplate.value,
@@ -118,12 +134,13 @@ onMounted(() => {
 function chooseImage() {
   fileInput.value?.click()
 }
-function onFileChange(event) {
-  const file = event.target.files?.[0]
+function onFileChange(event: Event) {
+  const input = event.currentTarget as HTMLInputElement
+  const file = input.files?.[0]
   loadImage(file)
-  event.target.value = ''
+  input.value = ''
 }
-function loadImage(file) {
+function loadImage(file: File | undefined | null) {
   if (!file) return
   imageError.value = ''
   if (file.type && !file.type.startsWith('image/')) {
@@ -153,24 +170,27 @@ function loadImage(file) {
   }
   image.src = url
 }
-function preventFileNavigation(event) {
-  if (!Array.from(event.dataTransfer?.types ?? []).includes('Files')) return
+function preventFileNavigation(event: DragEvent) {
+  const dataTransfer = event.dataTransfer
+  if (!dataTransfer || !Array.from(dataTransfer.types).includes('Files')) return
   event.preventDefault()
-  if (event.type === 'dragover') event.dataTransfer.dropEffect = 'none'
+  if (event.type === 'dragover') dataTransfer.dropEffect = 'none'
   else dropTarget.value = null
 }
-function onDragOver(event, target) {
-  if (!Array.from(event.dataTransfer?.types ?? []).includes('Files')) return
+function onDragOver(event: DragEvent, target: DropTarget) {
+  const dataTransfer = event.dataTransfer
+  if (!dataTransfer || !Array.from(dataTransfer.types).includes('Files')) return
   event.preventDefault()
   event.stopPropagation()
-  event.dataTransfer.dropEffect = 'copy'
+  dataTransfer.dropEffect = 'copy'
   dropTarget.value = target
 }
-function onDragLeave(event) {
-  if (!event.currentTarget.contains(event.relatedTarget))
+function onDragLeave(event: DragEvent) {
+  const element = event.currentTarget as HTMLElement
+  if (!element.contains(event.relatedTarget as Node | null))
     dropTarget.value = null
 }
-function onDrop(event) {
+function onDrop(event: DragEvent) {
   event.preventDefault()
   event.stopPropagation()
   dropTarget.value = null
@@ -197,15 +217,17 @@ function resetTextPositions() {
   delete next[activeTemplate.value]
   textOffsets.value = next
 }
-function pointerPosition(event) {
-  const rect = event.currentTarget.getBoundingClientRect()
+function pointerPosition(event: PointerEvent): CanvasPoint | null {
+  const rect = (
+    event.currentTarget as HTMLCanvasElement
+  ).getBoundingClientRect()
   if (!rect.width || !rect.height) return null
   return {
     x: ((event.clientX - rect.left) * previewWidth) / rect.width,
     y: ((event.clientY - rect.top) * previewHeight) / rect.height,
   }
 }
-function textAtPointer(position) {
+function textAtPointer(position: CanvasPoint | null): TextRegion | null {
   if (!position) return null
   return (
     [...textRegions]
@@ -219,7 +241,7 @@ function textAtPointer(position) {
       ) ?? null
   )
 }
-function artFrameAtPointer(position) {
+function artFrameAtPointer(position: CanvasPoint | null): ArtFrame | null {
   if (!position || (!artwork.value && selectedTemplate.value.id === 'bleed'))
     return null
   const frame = getArtFrame(
@@ -235,7 +257,7 @@ function artFrameAtPointer(position) {
     ? frame
     : null
 }
-function pointerDown(event) {
+function pointerDown(event: PointerEvent) {
   const position = pointerPosition(event)
   const textRegion = textAtPointer(position)
   const frame = textRegion ? null : artFrameAtPointer(position)
@@ -253,7 +275,7 @@ function pointerDown(event) {
       offset: currentTextOffsets.value[textRegion.id] ?? { x: 0, y: 0 },
       bounds: textRegion.bounds,
     }
-  } else {
+  } else if (frame) {
     hoveredText.value = null
     hoveredArtFrame.value = true
     dragStart = {
@@ -264,16 +286,19 @@ function pointerDown(event) {
       offset: currentArtOffset.value,
     }
   }
-  event.currentTarget.setPointerCapture(event.pointerId)
+  const canvas = event.currentTarget as HTMLCanvasElement
+  canvas.setPointerCapture(event.pointerId)
 }
-function pointerMove(event) {
+function pointerMove(event: PointerEvent) {
   if (!dragStart) {
     const position = pointerPosition(event)
     hoveredText.value = textAtPointer(position)?.id ?? null
     hoveredArtFrame.value = !hoveredText.value && !!artFrameAtPointer(position)
     return
   }
-  const rect = event.currentTarget.getBoundingClientRect()
+  const rect = (
+    event.currentTarget as HTMLCanvasElement
+  ).getBoundingClientRect()
   if (dragStart.type === 'text') {
     const dx = ((event.clientX - dragStart.x) / rect.width) * previewWidth
     const dy = ((event.clientY - dragStart.y) / rect.height) * previewHeight
@@ -319,15 +344,16 @@ function pointerMove(event) {
     },
   }
 }
-function pointerUp(event) {
+function pointerUp(event: PointerEvent) {
   isDragging.value = false
   draggingText.value = null
   dragStart = null
   const position = pointerPosition(event)
   hoveredText.value = textAtPointer(position)?.id ?? null
   hoveredArtFrame.value = !hoveredText.value && !!artFrameAtPointer(position)
-  if (event.currentTarget.hasPointerCapture(event.pointerId))
-    event.currentTarget.releasePointerCapture(event.pointerId)
+  const canvas = event.currentTarget as HTMLCanvasElement
+  if (canvas.hasPointerCapture(event.pointerId))
+    canvas.releasePointerCapture(event.pointerId)
 }
 function pointerLeave() {
   hoveredText.value = null
@@ -342,12 +368,17 @@ function canvasSizeForExport() {
 }
 async function exportPng() {
   isExporting.value = true
-  await new Promise((resolve) => requestAnimationFrame(resolve))
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
   const size = canvasSizeForExport()
   const canvas = document.createElement('canvas')
   canvas.width = size.width
   canvas.height = size.height
-  drawPage(canvas.getContext('2d'), size.width, size.height, {
+  const context = canvas.getContext('2d')
+  if (!context) {
+    isExporting.value = false
+    return
+  }
+  drawPage(context, size.width, size.height, {
     template: selectedTemplate.value,
     backgroundColor: selectedBackgroundColor.value,
     image: artwork.value,

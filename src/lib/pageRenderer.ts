@@ -1,10 +1,20 @@
-export const paperSizes = {
+import type {
+  ArtFrame,
+  Bounds,
+  DrawPageOptions,
+  LayoutTemplate,
+  PaperSizes,
+  PositionOffset,
+  TextRegion,
+} from '../@types/generator'
+
+export const paperSizes: PaperSizes = {
   A5: { width: 148, height: 210, label: '148 × 210 mm' },
   B5: { width: 182, height: 257, label: '182 × 257 mm' },
   A4: { width: 210, height: 297, label: '210 × 297 mm' },
 }
 
-export const templates = [
+export const templates: LayoutTemplate[] = [
   {
     id: 'calendar',
     name: '作品カレンダー',
@@ -39,7 +49,12 @@ export const templates = [
   },
 ]
 
-export function getArtFrame(template, width, height, offset = {}) {
+export function getArtFrame(
+  template: LayoutTemplate,
+  width: number,
+  height: number,
+  offset: Partial<PositionOffset> = {},
+): ArtFrame {
   const u = width / 100
   return {
     x: template.art.x * u + ((offset.x ?? 0) * width) / 100,
@@ -49,7 +64,12 @@ export function getArtFrame(template, width, height, offset = {}) {
   }
 }
 
-function fitText(ctx, text, maxWidth, initial) {
+function fitText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  initial: number,
+): number {
   let size = initial
   ctx.font = `700 ${size}px 'DM Mono', monospace`
   while (ctx.measureText(text).width > maxWidth && size > 5) {
@@ -59,7 +79,14 @@ function fitText(ctx, text, maxWidth, initial) {
   return size
 }
 
-function drawImageCover(ctx, image, frame, zoom, offsetX, offsetY) {
+function drawImageCover(
+  ctx: CanvasRenderingContext2D,
+  image: HTMLImageElement | null | undefined,
+  frame: ArtFrame,
+  zoom: number,
+  offsetX: number,
+  offsetY: number,
+): void {
   if (!image) {
     const gradient = ctx.createLinearGradient(
       frame.x,
@@ -80,7 +107,7 @@ function drawImageCover(ctx, image, frame, zoom, offsetX, offsetY) {
   }
   const imageRatio = image.naturalWidth / image.naturalHeight
   const frameRatio = frame.w / frame.h
-  let width, height
+  let width: number, height: number
   if (imageRatio > frameRatio) {
     height = frame.h * zoom
     width = height * imageRatio
@@ -101,18 +128,16 @@ function drawImageCover(ctx, image, frame, zoom, offsetX, offsetY) {
 }
 
 function drawText(
-  ctx,
-  regions,
-  id,
-  text,
-  x,
-  y,
-  font,
-  align,
-  color,
-  offset,
-  page,
-) {
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  font: string,
+  align: CanvasTextAlign,
+  color: string,
+  offset: PositionOffset | undefined,
+  page: { width: number; height: number },
+): { bounds: Bounds; hit: Bounds } {
   ctx.font = font
   ctx.textAlign = align
   ctx.fillStyle = color
@@ -121,7 +146,7 @@ function drawText(
   ctx.fillText(text, shiftedX, shiftedY)
 
   const metrics = ctx.measureText(text)
-  const fontSize = Number.parseFloat(font.match(/[\d.]+px/)?.[0]) || 12
+  const fontSize = Number.parseFloat(font.match(/[\d.]+px/)?.[0] ?? '') || 12
   const ascent = metrics.actualBoundingBoxAscent || fontSize * 0.8
   const descent = metrics.actualBoundingBoxDescent || fontSize * 0.2
   const left =
@@ -137,8 +162,7 @@ function drawText(
     height: ascent + descent,
   }
   const padding = Math.max(5, fontSize * 0.65)
-  regions.push({
-    id,
+  return {
     bounds,
     hit: {
       x: left - padding,
@@ -146,10 +170,15 @@ function drawText(
       width: Math.max(metrics.width, 8) + padding * 2,
       height: bounds.height + padding * 2,
     },
-  })
+  }
 }
 
-export function drawPage(ctx, width, height, options) {
+export function drawPage(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  options: DrawPageOptions,
+): TextRegion[] {
   const {
     template,
     backgroundColor = template.backgroundColor,
@@ -178,7 +207,7 @@ export function drawPage(ctx, width, height, options) {
   if (image || template.id !== 'bleed') {
     drawImageCover(ctx, image, frame, zoom, offsetX, offsetY)
   }
-  const textRegions = []
+  const textRegions: TextRegion[] = []
   const page = { width, height }
 
   if (template.id !== 'bleed') {
@@ -199,7 +228,6 @@ export function drawPage(ctx, width, height, options) {
     const dateOffset = textOffsets.dateBlock
     const lineX = x + ((dateOffset?.x ?? 0) * width) / 100
     const lineY = y + ((dateOffset?.y ?? 0) * height) / 100
-    const dateRegions = []
     ctx.strokeStyle = lightInk ? '#fffefa' : '#33332f'
     ctx.lineWidth = Math.max(1, u * 0.15)
     ctx.beginPath()
@@ -212,10 +240,8 @@ export function drawPage(ctx, width, height, options) {
       width * 0.18,
       u * 3.1,
     )
-    drawText(
+    const dateNumberRegion = drawText(
       ctx,
-      dateRegions,
-      'dateNumber',
       String(pageNumber).padStart(2, '0'),
       x + u * 1.8,
       y - u * 1.8,
@@ -225,10 +251,8 @@ export function drawPage(ctx, width, height, options) {
       dateOffset,
       page,
     )
-    drawText(
+    const dateRegion = drawText(
       ctx,
-      dateRegions,
-      'date',
       printedDate || 'YYYY-MM-DD',
       x + u * 1.8,
       y + u * 2,
@@ -238,6 +262,7 @@ export function drawPage(ctx, width, height, options) {
       dateOffset,
       page,
     )
+    const dateRegions = [dateNumberRegion, dateRegion]
     const linePadding = Math.max(5, u * 2)
     const hitRects = [
       ...dateRegions.map((region) => region.hit),
@@ -257,7 +282,7 @@ export function drawPage(ctx, width, height, options) {
         height: u * 10,
       },
     ]
-    const enclosingRect = (rects) => {
+    const enclosingRect = (rects: Bounds[]): Bounds => {
       const left = Math.min(...rects.map((rect) => rect.x))
       const top = Math.min(...rects.map((rect) => rect.y))
       const right = Math.max(...rects.map((rect) => rect.x + rect.width))
@@ -272,34 +297,36 @@ export function drawPage(ctx, width, height, options) {
   }
 
   if (template.number === 'bottom') {
-    drawText(
-      ctx,
-      textRegions,
-      'footerNumber',
-      String(pageNumber),
-      width / 2,
-      height - u * 4.2,
-      `700 ${u * 2.1}px 'DM Mono', monospace`,
-      'center',
-      lightInk ? '#fffefa' : '#20201e',
-      textOffsets.footerNumber,
-      page,
-    )
+    textRegions.push({
+      id: 'footerNumber',
+      ...drawText(
+        ctx,
+        String(pageNumber),
+        width / 2,
+        height - u * 4.2,
+        `700 ${u * 2.1}px 'DM Mono', monospace`,
+        'center',
+        lightInk ? '#fffefa' : '#20201e',
+        textOffsets.footerNumber,
+        page,
+      ),
+    })
   }
   if (template.number === 'over') {
-    drawText(
-      ctx,
-      textRegions,
-      'overNumber',
-      String(pageNumber).padStart(2, '0'),
-      width - u * 5,
-      height - u * 4.5,
-      `700 ${u * 2.1}px 'DM Mono', monospace`,
-      'right',
-      image || lightInk ? '#fffefa' : '#20201e',
-      textOffsets.overNumber,
-      page,
-    )
+    textRegions.push({
+      id: 'overNumber',
+      ...drawText(
+        ctx,
+        String(pageNumber).padStart(2, '0'),
+        width - u * 5,
+        height - u * 4.5,
+        `700 ${u * 2.1}px 'DM Mono', monospace`,
+        'right',
+        image || lightInk ? '#fffefa' : '#20201e',
+        textOffsets.overNumber,
+        page,
+      ),
+    })
   }
   if (showGuide && activeTextId) {
     const region = textRegions.find((item) => item.id === activeTextId)
