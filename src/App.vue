@@ -1,6 +1,11 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { drawPage, paperSizes, templates } from './lib/pageRenderer'
+import {
+  drawPage,
+  getArtFrame,
+  paperSizes,
+  templates,
+} from './lib/pageRenderer'
 
 const previewCanvas = ref(null)
 const fileInput = ref(null)
@@ -18,7 +23,9 @@ const exportDpi = ref(300)
 const isDragging = ref(false)
 const draggingText = ref(null)
 const hoveredText = ref(null)
+const hoveredArtFrame = ref(false)
 const textOffsets = ref({})
+const artOffsets = ref({})
 const isExporting = ref(false)
 const dropTarget = ref(null)
 const imageError = ref('')
@@ -45,6 +52,9 @@ const selectedBackgroundColor = computed({
 const selectedPaper = computed(() => paperSizes[exportSize.value])
 const currentTextOffsets = computed(
   () => textOffsets.value[activeTemplate.value] ?? {},
+)
+const currentArtOffset = computed(
+  () => artOffsets.value[activeTemplate.value] ?? { x: 0, y: 0 },
 )
 
 function renderPreview() {
@@ -74,6 +84,8 @@ function renderPreview() {
     showGuide: true,
     textOffsets: currentTextOffsets.value,
     activeTextId: draggingText.value || hoveredText.value,
+    artOffset: currentArtOffset.value,
+    activeArtFrame: hoveredArtFrame.value,
   })
 }
 
@@ -89,8 +101,10 @@ watch(
     exportSize,
     artwork,
     textOffsets,
+    artOffsets,
     draggingText,
     hoveredText,
+    hoveredArtFrame,
   ],
   () => nextTick(renderPreview),
 )
@@ -173,35 +187,64 @@ function resetImage() {
   imageX.value = 0
   imageY.value = 0
 }
+function resetArtFrame() {
+  const next = { ...artOffsets.value }
+  delete next[activeTemplate.value]
+  artOffsets.value = next
+}
 function resetTextPositions() {
   const next = { ...textOffsets.value }
   delete next[activeTemplate.value]
   textOffsets.value = next
 }
-function textAtPointer(event) {
+function pointerPosition(event) {
   const rect = event.currentTarget.getBoundingClientRect()
   if (!rect.width || !rect.height) return null
-  const x = ((event.clientX - rect.left) * previewWidth) / rect.width
-  const y = ((event.clientY - rect.top) * previewHeight) / rect.height
+  return {
+    x: ((event.clientX - rect.left) * previewWidth) / rect.width,
+    y: ((event.clientY - rect.top) * previewHeight) / rect.height,
+  }
+}
+function textAtPointer(position) {
+  if (!position) return null
   return (
     [...textRegions]
       .reverse()
       .find(
         ({ hit }) =>
-          x >= hit.x &&
-          x <= hit.x + hit.width &&
-          y >= hit.y &&
-          y <= hit.y + hit.height,
+          position.x >= hit.x &&
+          position.x <= hit.x + hit.width &&
+          position.y >= hit.y &&
+          position.y <= hit.y + hit.height,
       ) ?? null
   )
 }
+function artFrameAtPointer(position) {
+  if (!position || (!artwork.value && selectedTemplate.value.id === 'bleed'))
+    return null
+  const frame = getArtFrame(
+    selectedTemplate.value,
+    previewWidth,
+    previewHeight,
+    currentArtOffset.value,
+  )
+  return position.x >= frame.x &&
+    position.x <= frame.x + frame.w &&
+    position.y >= frame.y &&
+    position.y <= frame.y + frame.h
+    ? frame
+    : null
+}
 function pointerDown(event) {
-  const textRegion = textAtPointer(event)
-  if (!textRegion && !artwork.value) return
+  const position = pointerPosition(event)
+  const textRegion = textAtPointer(position)
+  const frame = textRegion ? null : artFrameAtPointer(position)
+  if (!textRegion && !frame) return
   isDragging.value = true
   if (textRegion) {
     draggingText.value = textRegion.id
     hoveredText.value = textRegion.id
+    hoveredArtFrame.value = false
     dragStart = {
       type: 'text',
       id: textRegion.id,
@@ -211,19 +254,23 @@ function pointerDown(event) {
       bounds: textRegion.bounds,
     }
   } else {
+    hoveredText.value = null
+    hoveredArtFrame.value = true
     dragStart = {
-      type: 'image',
+      type: 'artFrame',
       x: event.clientX,
       y: event.clientY,
-      offsetX: imageX.value,
-      offsetY: imageY.value,
+      frame,
+      offset: currentArtOffset.value,
     }
   }
   event.currentTarget.setPointerCapture(event.pointerId)
 }
 function pointerMove(event) {
   if (!dragStart) {
-    hoveredText.value = textAtPointer(event)?.id ?? null
+    const position = pointerPosition(event)
+    hoveredText.value = textAtPointer(position)?.id ?? null
+    hoveredArtFrame.value = !hoveredText.value && !!artFrameAtPointer(position)
     return
   }
   const rect = event.currentTarget.getBoundingClientRect()
@@ -253,27 +300,38 @@ function pointerMove(event) {
     }
     return
   }
-  imageX.value = Math.max(
-    -100,
-    Math.min(
-      100,
-      dragStart.offsetX + ((event.clientX - dragStart.x) / rect.width) * 120,
-    ),
+  const dx = ((event.clientX - dragStart.x) / rect.width) * previewWidth
+  const dy = ((event.clientY - dragStart.y) / rect.height) * previewHeight
+  const { frame, offset } = dragStart
+  const limitedX = Math.max(
+    -frame.x,
+    Math.min(previewWidth - frame.x - frame.w, dx),
   )
-  imageY.value = Math.max(
-    -100,
-    Math.min(
-      100,
-      dragStart.offsetY + ((event.clientY - dragStart.y) / rect.height) * 120,
-    ),
+  const limitedY = Math.max(
+    -frame.y,
+    Math.min(previewHeight - frame.y - frame.h, dy),
   )
+  artOffsets.value = {
+    ...artOffsets.value,
+    [activeTemplate.value]: {
+      x: offset.x + (limitedX / previewWidth) * 100,
+      y: offset.y + (limitedY / previewHeight) * 100,
+    },
+  }
 }
 function pointerUp(event) {
   isDragging.value = false
   draggingText.value = null
   dragStart = null
+  const position = pointerPosition(event)
+  hoveredText.value = textAtPointer(position)?.id ?? null
+  hoveredArtFrame.value = !hoveredText.value && !!artFrameAtPointer(position)
   if (event.currentTarget.hasPointerCapture(event.pointerId))
     event.currentTarget.releasePointerCapture(event.pointerId)
+}
+function pointerLeave() {
+  hoveredText.value = null
+  hoveredArtFrame.value = false
 }
 function canvasSizeForExport() {
   const pixelsPerMm = exportDpi.value / 25.4
@@ -300,6 +358,7 @@ async function exportPng() {
     offsetY: imageY.value,
     showGuide: false,
     textOffsets: currentTextOffsets.value,
+    artOffset: currentArtOffset.value,
   })
   const link = document.createElement('a')
   link.download = `doujin-page-${exportSize.value.toLowerCase()}-${exportDpi.value}dpi.png`
@@ -378,6 +437,9 @@ onBeforeUnmount(() => {
             <input v-model="selectedBackgroundColor" type="color" />
             <output>{{ selectedBackgroundColor.toUpperCase() }}</output>
           </label>
+          <button class="reset-text" @click="resetArtFrame">
+            表示枠の位置を戻す
+          </button>
         </section>
         <section class="panel controls">
           <div class="section-label"><span>03</span> 調整</div>
@@ -410,7 +472,7 @@ onBeforeUnmount(() => {
               placeholder="YYYY-MM-DD"
           /></label>
           <button class="reset-text" @click="resetTextPositions">
-            要素の位置を戻す
+            文字の位置を戻す
           </button>
         </section>
         <section class="panel export-settings">
@@ -453,12 +515,15 @@ onBeforeUnmount(() => {
           <canvas
             ref="previewCanvas"
             class="page-canvas"
-            :class="{ draggable: artwork || hoveredText, dragging: isDragging }"
+            :class="{
+              draggable: hoveredArtFrame || hoveredText,
+              dragging: isDragging,
+            }"
             @pointerdown="pointerDown"
             @pointermove="pointerMove"
             @pointerup="pointerUp"
             @pointercancel="pointerUp"
-            @pointerleave="hoveredText = null"
+            @pointerleave="pointerLeave"
           ></canvas>
           <div v-if="!artwork" class="empty-state">
             <div>＋</div>
@@ -470,8 +535,8 @@ onBeforeUnmount(() => {
         <p class="drag-hint">
           {{
             artwork
-              ? '文字や日付の線をドラッグして配置、その他の場所をドラッグして画像の位置を調整できます。'
-              : '文字や日付の線をドラッグして配置できます。作品画像もアップロードできます。'
+              ? '画像の表示枠と文字をドラッグして配置できます。画像内の位置は左のスライダーで調整できます。'
+              : '表示枠と文字をドラッグして配置できます。作品画像もアップロードできます。'
           }}
         </p>
       </section>

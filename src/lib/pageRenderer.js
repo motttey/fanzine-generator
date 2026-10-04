@@ -39,6 +39,16 @@ export const templates = [
   },
 ]
 
+export function getArtFrame(template, width, height, offset = {}) {
+  const u = width / 100
+  return {
+    x: template.art.x * u + ((offset.x ?? 0) * width) / 100,
+    y: template.art.y * u + ((offset.y ?? 0) * height) / 100,
+    w: template.art.w * u,
+    h: template.art.h * u,
+  }
+}
+
 function fitText(ctx, text, maxWidth, initial) {
   let size = initial
   ctx.font = `700 ${size}px 'DM Mono', monospace`
@@ -152,6 +162,8 @@ export function drawPage(ctx, width, height, options) {
     showGuide,
     textOffsets = {},
     activeTextId,
+    artOffset,
+    activeArtFrame,
   } = options
   const u = width / 100
   const red = Number.parseInt(backgroundColor.slice(1, 3), 16)
@@ -159,12 +171,7 @@ export function drawPage(ctx, width, height, options) {
   const blue = Number.parseInt(backgroundColor.slice(5, 7), 16)
   const backgroundBrightness = red * 0.299 + green * 0.587 + blue * 0.114
   const lightInk = backgroundBrightness < 150
-  const frame = {
-    x: template.art.x * u,
-    y: template.art.y * u,
-    w: template.art.w * u,
-    h: template.art.h * u,
-  }
+  const frame = getArtFrame(template, width, height, artOffset)
   ctx.clearRect(0, 0, width, height)
   ctx.fillStyle = backgroundColor
   ctx.fillRect(0, 0, width, height)
@@ -310,7 +317,7 @@ export function drawPage(ctx, width, height, options) {
       ctx.restore()
     }
   }
-  if (showGuide && image) {
+  if (showGuide && (image || activeArtFrame)) {
     ctx.save()
     ctx.strokeStyle = 'rgba(255, 89, 51, .85)'
     ctx.setLineDash([u * 1, u * 0.7])
