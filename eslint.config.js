@@ -15,7 +15,6 @@ export default [
   {
     files: ['src/lib/**/*.ts'],
     languageOptions: { parser: tsParser, globals: globals.browser },
-    rules: { 'no-undef': 'off' },
   },
   {
     files: ['src/**/*.{js,vue}'],

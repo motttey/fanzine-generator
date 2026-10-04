@@ -1,6 +1,7 @@
 import type {
   ArtFrame,
   Bounds,
+  CanvasTextAlign,
   DrawPageOptions,
   LayoutTemplate,
   PaperSizes,

@@ -2,6 +2,7 @@ export type TemplateId = 'calendar' | 'gallery' | 'bleed' | 'postcard'
 export type PaperSizeId = 'A5' | 'B5' | 'A4'
 export type LayoutElementId = 'dateBlock' | 'footerNumber' | 'overNumber'
 export type DropTarget = 'upload' | 'preview'
+export type CanvasTextAlign = "center" | "end" | "left" | "right" | "start"
 
 /** Page relative offset, in percent of the page width and height. */
 export interface PositionOffset {
