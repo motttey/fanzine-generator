@@ -15,6 +15,6 @@
 - `npm run format:check` — 整形済みか検査（ファイル変更なし）
 - `npm run build` — 本番ビルド
 
-ESLintはJavaScriptの推奨ルールとVueの必須ルールを使用し、TypeScriptとVueは`vue-tsc`で型を検査します。整形はPrettierが担当します。
+ESLintはJavaScriptの推奨ルールとVueの必須ルールを使用します。TypeScriptは7系の`tsc`、Vueは互換性のある6系の`vue-tsc`で型を検査します。整形はPrettierが担当します。
 
 Prettierはセミコロンなし・シングルクォートで、それ以外は標準設定です。
