@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type {
   ArtFrame,
   ArtOffsetsByTemplate,
+  ArtSizesByTemplate,
   BackgroundColors,
   CanvasPoint,
   DragStart,
@@ -16,6 +17,7 @@ import type {
 import {
   drawPage,
   getArtFrame,
+  getArtResizeHandle,
   paperSizes,
   templates,
 } from './lib/pageRenderer'
@@ -37,8 +39,10 @@ const isDragging = ref(false)
 const draggingText = ref<LayoutElementId | null>(null)
 const hoveredText = ref<LayoutElementId | null>(null)
 const hoveredArtFrame = ref(false)
+const hoveredResizeHandle = ref(false)
 const textOffsets = ref<TextOffsetsByTemplate>({})
 const artOffsets = ref<ArtOffsetsByTemplate>({})
+const artSizes = ref<ArtSizesByTemplate>({})
 const isExporting = ref(false)
 const dropTarget = ref<DropTarget | null>(null)
 const imageError = ref('')
@@ -71,6 +75,7 @@ const currentTextOffsets = computed(
 const currentArtOffset = computed(
   () => artOffsets.value[activeTemplate.value] ?? { x: 0, y: 0 },
 )
+const currentArtSize = computed(() => artSizes.value[activeTemplate.value])
 
 function renderPreview() {
   const canvas = previewCanvas.value
@@ -101,6 +106,7 @@ function renderPreview() {
     textOffsets: currentTextOffsets.value,
     activeTextId: draggingText.value || hoveredText.value,
     artOffset: currentArtOffset.value,
+    artSize: currentArtSize.value,
     activeArtFrame: hoveredArtFrame.value,
   })
 }
@@ -118,6 +124,7 @@ watch(
     artwork,
     textOffsets,
     artOffsets,
+    artSizes,
     draggingText,
     hoveredText,
     hoveredArtFrame,
@@ -208,9 +215,12 @@ function resetImage() {
   imageY.value = 0
 }
 function resetArtFrame() {
-  const next = { ...artOffsets.value }
-  delete next[activeTemplate.value]
-  artOffsets.value = next
+  const nextOffsets = { ...artOffsets.value }
+  const nextSizes = { ...artSizes.value }
+  delete nextOffsets[activeTemplate.value]
+  delete nextSizes[activeTemplate.value]
+  artOffsets.value = nextOffsets
+  artSizes.value = nextSizes
 }
 function resetTextPositions() {
   const next = { ...textOffsets.value }
@@ -241,15 +251,18 @@ function textAtPointer(position: CanvasPoint | null): TextRegion | null {
       ) ?? null
   )
 }
-function artFrameAtPointer(position: CanvasPoint | null): ArtFrame | null {
-  if (!position || (!artwork.value && selectedTemplate.value.id === 'bleed'))
-    return null
-  const frame = getArtFrame(
+function currentArtFrame(): ArtFrame {
+  return getArtFrame(
     selectedTemplate.value,
     previewWidth,
     previewHeight,
     currentArtOffset.value,
+    currentArtSize.value,
   )
+}
+function artFrameAtPointer(position: CanvasPoint | null): ArtFrame | null {
+  if (!position) return null
+  const frame = currentArtFrame()
   return position.x >= frame.x &&
     position.x <= frame.x + frame.w &&
     position.y >= frame.y &&
@@ -257,16 +270,38 @@ function artFrameAtPointer(position: CanvasPoint | null): ArtFrame | null {
     ? frame
     : null
 }
+function resizeHandleAtPointer(position: CanvasPoint | null): ArtFrame | null {
+  if (!position) return null
+  const frame = currentArtFrame()
+  const handle = getArtResizeHandle(frame, previewWidth)
+  const hitRadius = Math.max(14, handle.size)
+  return Math.abs(position.x - handle.x) <= hitRadius &&
+    Math.abs(position.y - handle.y) <= hitRadius
+    ? frame
+    : null
+}
 function pointerDown(event: PointerEvent) {
   const position = pointerPosition(event)
-  const textRegion = textAtPointer(position)
-  const frame = textRegion ? null : artFrameAtPointer(position)
-  if (!textRegion && !frame) return
+  const resizeFrame = resizeHandleAtPointer(position)
+  const textRegion = resizeFrame ? null : textAtPointer(position)
+  const frame = textRegion || resizeFrame ? null : artFrameAtPointer(position)
+  if (!textRegion && !frame && !resizeFrame) return
   isDragging.value = true
-  if (textRegion) {
+  if (resizeFrame) {
+    hoveredText.value = null
+    hoveredArtFrame.value = true
+    hoveredResizeHandle.value = true
+    dragStart = {
+      type: 'artFrameResize',
+      x: event.clientX,
+      y: event.clientY,
+      frame: resizeFrame,
+    }
+  } else if (textRegion) {
     draggingText.value = textRegion.id
     hoveredText.value = textRegion.id
     hoveredArtFrame.value = false
+    hoveredResizeHandle.value = false
     dragStart = {
       type: 'text',
       id: textRegion.id,
@@ -278,6 +313,7 @@ function pointerDown(event: PointerEvent) {
   } else if (frame) {
     hoveredText.value = null
     hoveredArtFrame.value = true
+    hoveredResizeHandle.value = false
     dragStart = {
       type: 'artFrame',
       x: event.clientX,
@@ -292,7 +328,10 @@ function pointerDown(event: PointerEvent) {
 function pointerMove(event: PointerEvent) {
   if (!dragStart) {
     const position = pointerPosition(event)
-    hoveredText.value = textAtPointer(position)?.id ?? null
+    hoveredResizeHandle.value = !!resizeHandleAtPointer(position)
+    hoveredText.value = hoveredResizeHandle.value
+      ? null
+      : (textAtPointer(position)?.id ?? null)
     hoveredArtFrame.value = !hoveredText.value && !!artFrameAtPointer(position)
     return
   }
@@ -325,6 +364,29 @@ function pointerMove(event: PointerEvent) {
     }
     return
   }
+  if (dragStart.type === 'artFrameResize') {
+    const dx = ((event.clientX - dragStart.x) / rect.width) * previewWidth
+    const dy = ((event.clientY - dragStart.y) / rect.height) * previewHeight
+    const { frame } = dragStart
+    const maxWidth = previewWidth - frame.x
+    const maxHeight = previewHeight - frame.y
+    const width = Math.max(
+      Math.min(previewWidth * 0.08, maxWidth),
+      Math.min(maxWidth, frame.w + dx),
+    )
+    const height = Math.max(
+      Math.min(previewHeight * 0.08, maxHeight),
+      Math.min(maxHeight, frame.h + dy),
+    )
+    artSizes.value = {
+      ...artSizes.value,
+      [activeTemplate.value]: {
+        w: (width / previewWidth) * 100,
+        h: (height / previewHeight) * 100,
+      },
+    }
+    return
+  }
   const dx = ((event.clientX - dragStart.x) / rect.width) * previewWidth
   const dy = ((event.clientY - dragStart.y) / rect.height) * previewHeight
   const { frame, offset } = dragStart
@@ -349,7 +411,10 @@ function pointerUp(event: PointerEvent) {
   draggingText.value = null
   dragStart = null
   const position = pointerPosition(event)
-  hoveredText.value = textAtPointer(position)?.id ?? null
+  hoveredResizeHandle.value = !!resizeHandleAtPointer(position)
+  hoveredText.value = hoveredResizeHandle.value
+    ? null
+    : (textAtPointer(position)?.id ?? null)
   hoveredArtFrame.value = !hoveredText.value && !!artFrameAtPointer(position)
   const canvas = event.currentTarget as HTMLCanvasElement
   if (canvas.hasPointerCapture(event.pointerId))
@@ -358,6 +423,7 @@ function pointerUp(event: PointerEvent) {
 function pointerLeave() {
   hoveredText.value = null
   hoveredArtFrame.value = false
+  hoveredResizeHandle.value = false
 }
 function canvasSizeForExport() {
   const pixelsPerMm = exportDpi.value / 25.4
@@ -390,6 +456,7 @@ async function exportPng() {
     showGuide: false,
     textOffsets: currentTextOffsets.value,
     artOffset: currentArtOffset.value,
+    artSize: currentArtSize.value,
   })
   const link = document.createElement('a')
   link.download = `doujin-page-${exportSize.value.toLowerCase()}-${exportDpi.value}dpi.png`
@@ -469,7 +536,7 @@ onBeforeUnmount(() => {
             <output>{{ selectedBackgroundColor.toUpperCase() }}</output>
           </label>
           <button class="reset-text" @click="resetArtFrame">
-            表示枠の位置を戻す
+            表示枠の位置・サイズを戻す
           </button>
         </section>
         <section class="panel controls">
@@ -549,6 +616,7 @@ onBeforeUnmount(() => {
             :class="{
               draggable: hoveredArtFrame || hoveredText,
               dragging: isDragging,
+              resizing: hoveredResizeHandle,
             }"
             @pointerdown="pointerDown"
             @pointermove="pointerMove"
@@ -566,8 +634,8 @@ onBeforeUnmount(() => {
         <p class="drag-hint">
           {{
             artwork
-              ? '画像の表示枠と文字をドラッグして配置できます。画像内の位置は左のスライダーで調整できます。'
-              : '表示枠と文字をドラッグして配置できます。作品画像もアップロードできます。'
+              ? '表示枠の右下をドラッグするとサイズ変更、枠内をドラッグすると移動できます。画像内の位置は左のスライダーで調整できます。'
+              : '表示枠の右下をドラッグするとサイズ変更、枠内と文字はドラッグで移動できます。作品画像もアップロードできます。'
           }}
         </p>
       </section>

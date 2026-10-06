@@ -397,6 +397,9 @@ select {
 .page-canvas.dragging {
   cursor: grabbing;
 }
+.page-canvas.resizing {
+  cursor: nwse-resize;
+}
 .empty-state {
   position: absolute;
   inset: 0;

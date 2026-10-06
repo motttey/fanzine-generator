@@ -1,11 +1,13 @@
 import type {
   ArtFrame,
+  ArtSize,
   Bounds,
   CanvasTextAlign,
   DrawPageOptions,
   LayoutTemplate,
   PaperSizes,
   PositionOffset,
+  ResizeHandle,
   TextRegion,
 } from '../@types/generator'
 
@@ -55,13 +57,26 @@ export function getArtFrame(
   width: number,
   height: number,
   offset: Partial<PositionOffset> = {},
+  size?: ArtSize,
 ): ArtFrame {
   const u = width / 100
   return {
     x: template.art.x * u + ((offset.x ?? 0) * width) / 100,
     y: template.art.y * u + ((offset.y ?? 0) * height) / 100,
-    w: template.art.w * u,
-    h: template.art.h * u,
+    w: size ? (size.w * width) / 100 : template.art.w * u,
+    h: size ? (size.h * height) / 100 : template.art.h * u,
+  }
+}
+
+export function getArtResizeHandle(
+  frame: ArtFrame,
+  pageWidth: number,
+): ResizeHandle {
+  const size = Math.max(12, pageWidth * 0.025)
+  return {
+    x: frame.x + frame.w - size / 2,
+    y: frame.y + frame.h - size / 2,
+    size,
   }
 }
 
@@ -193,6 +208,7 @@ export function drawPage(
     textOffsets = {},
     activeTextId,
     artOffset,
+    artSize,
     activeArtFrame,
   } = options
   const u = width / 100
@@ -201,7 +217,7 @@ export function drawPage(
   const blue = Number.parseInt(backgroundColor.slice(5, 7), 16)
   const backgroundBrightness = red * 0.299 + green * 0.587 + blue * 0.114
   const lightInk = backgroundBrightness < 150
-  const frame = getArtFrame(template, width, height, artOffset)
+  const frame = getArtFrame(template, width, height, artOffset, artSize)
   ctx.clearRect(0, 0, width, height)
   ctx.fillStyle = backgroundColor
   ctx.fillRect(0, 0, width, height)
@@ -345,12 +361,29 @@ export function drawPage(
       ctx.restore()
     }
   }
-  if (showGuide && (image || activeArtFrame)) {
+  if (showGuide) {
     ctx.save()
-    ctx.strokeStyle = 'rgba(255, 89, 51, .85)'
+    ctx.strokeStyle = activeArtFrame ? '#f15132' : 'rgba(255, 89, 51, .85)'
     ctx.setLineDash([u * 1, u * 0.7])
     ctx.lineWidth = Math.max(1, u * 0.15)
     ctx.strokeRect(frame.x, frame.y, frame.w, frame.h)
+    const handle = getArtResizeHandle(frame, width)
+    ctx.setLineDash([])
+    ctx.fillStyle = '#fffefa'
+    ctx.fillRect(
+      handle.x - handle.size / 2,
+      handle.y - handle.size / 2,
+      handle.size,
+      handle.size,
+    )
+    ctx.strokeStyle = '#f15132'
+    ctx.lineWidth = Math.max(2, u * 0.3)
+    ctx.strokeRect(
+      handle.x - handle.size / 2,
+      handle.y - handle.size / 2,
+      handle.size,
+      handle.size,
+    )
     ctx.restore()
   }
   return textRegions

@@ -32,6 +32,18 @@ export interface ArtFrame {
   h: number
 }
 
+/** Artwork frame size, in percent of the page width and height. */
+export interface ArtSize {
+  w: number
+  h: number
+}
+
+export interface ResizeHandle {
+  x: number
+  y: number
+  size: number
+}
+
 /** Hit area or drawn bounds in canvas pixels. */
 export interface Bounds {
   x: number
@@ -60,6 +72,7 @@ export interface LayoutTemplate {
 export type TextOffsets = Partial<Record<LayoutElementId, PositionOffset>>
 export type TextOffsetsByTemplate = Partial<Record<TemplateId, TextOffsets>>
 export type ArtOffsetsByTemplate = Partial<Record<TemplateId, PositionOffset>>
+export type ArtSizesByTemplate = Partial<Record<TemplateId, ArtSize>>
 export type BackgroundColors = Partial<Record<TemplateId, string>>
 
 export interface LayoutState {
@@ -67,6 +80,7 @@ export interface LayoutState {
   backgroundColors: BackgroundColors
   textOffsets: TextOffsetsByTemplate
   artOffsets: ArtOffsetsByTemplate
+  artSizes: ArtSizesByTemplate
 }
 
 export interface ImageState {
@@ -116,6 +130,12 @@ export type DragStart =
       frame: ArtFrame
       offset: PositionOffset
     }
+  | {
+      type: 'artFrameResize'
+      x: number
+      y: number
+      frame: ArtFrame
+    }
 
 export interface DrawPageOptions {
   template: LayoutTemplate
@@ -130,5 +150,6 @@ export interface DrawPageOptions {
   textOffsets?: TextOffsets
   activeTextId?: LayoutElementId | null
   artOffset?: PositionOffset
+  artSize?: ArtSize
   activeArtFrame?: boolean
 }
