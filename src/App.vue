@@ -46,6 +46,10 @@ const artSizes = ref<ArtSizesByTemplate>({})
 const isExporting = ref(false)
 const dropTarget = ref<DropTarget | null>(null)
 const imageError = ref('')
+const exportError = ref('')
+const supportedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
+const maxImageBytes = 30 * 1024 * 1024
+const maxImagePixels = 30_000_000
 let objectUrl: string | null = null
 let dragStart: DragStart | null = null
 let textRegions: TextRegion[] = []
@@ -150,8 +154,15 @@ function onFileChange(event: Event) {
 function loadImage(file: File | undefined | null) {
   if (!file) return
   imageError.value = ''
-  if (file.type && !file.type.startsWith('image/')) {
-    imageError.value = '画像ファイルを選択してください。'
+  if (
+    !supportedImageTypes.has(file.type) &&
+    !(file.type === '' && /\.(jpe?g|png|webp)$/i.test(file.name))
+  ) {
+    imageError.value = 'JPG・PNG・WebP の画像を選択してください。'
+    return
+  }
+  if (file.size === 0 || file.size > maxImageBytes) {
+    imageError.value = '画像は 30 MB 以下のファイルを選択してください。'
     return
   }
   if (objectUrl) URL.revokeObjectURL(objectUrl)
@@ -162,6 +173,14 @@ function loadImage(file: File | undefined | null) {
     if (objectUrl !== url) return
     URL.revokeObjectURL(url)
     objectUrl = null
+    if (
+      !image.naturalWidth ||
+      !image.naturalHeight ||
+      image.naturalWidth * image.naturalHeight > maxImagePixels
+    ) {
+      imageError.value = '画像の解像度は 3000 万画素以下にしてください。'
+      return
+    }
     artwork.value = image
     artworkName.value = file.name
     imageError.value = ''
@@ -425,44 +444,63 @@ function pointerLeave() {
   hoveredArtFrame.value = false
   hoveredResizeHandle.value = false
 }
-function canvasSizeForExport() {
-  const pixelsPerMm = exportDpi.value / 25.4
+function canvasSizeForExport(paperSize: PaperSizeId, dpi: number) {
+  const pixelsPerMm = dpi / 25.4
+  const paper = paperSizes[paperSize]
   return {
-    width: Math.round(selectedPaper.value.width * pixelsPerMm),
-    height: Math.round(selectedPaper.value.height * pixelsPerMm),
+    width: Math.round(paper.width * pixelsPerMm),
+    height: Math.round(paper.height * pixelsPerMm),
   }
 }
 async function exportPng() {
+  if (isExporting.value) return
   isExporting.value = true
-  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
-  const size = canvasSizeForExport()
-  const canvas = document.createElement('canvas')
-  canvas.width = size.width
-  canvas.height = size.height
-  const context = canvas.getContext('2d')
-  if (!context) {
+  exportError.value = ''
+  try {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    await document.fonts.ready
+    const paperSize = exportSize.value
+    const dpi = exportDpi.value
+    const size = canvasSizeForExport(paperSize, dpi)
+    const canvas = document.createElement('canvas')
+    canvas.width = size.width
+    canvas.height = size.height
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('Canvas is unavailable')
+    drawPage(context, size.width, size.height, {
+      template: selectedTemplate.value,
+      backgroundColor: selectedBackgroundColor.value,
+      image: artwork.value,
+      pageNumber: pageNumber.value,
+      printedDate: printedDate.value,
+      zoom: imageZoom.value / 100,
+      offsetX: imageX.value,
+      offsetY: imageY.value,
+      showGuide: false,
+      textOffsets: currentTextOffsets.value,
+      artOffset: currentArtOffset.value,
+      artSize: currentArtSize.value,
+    })
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((result) => {
+        if (result) resolve(result)
+        else reject(new Error('PNG encoding failed'))
+      }, 'image/png')
+    })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.download = `doujin-page-${paperSize.toLowerCase()}-${dpi}dpi.png`
+    link.href = url
+    document.body.append(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  } catch {
+    exportError.value =
+      'PNG を書き出せませんでした。画像を小さくするか、解像度を 150 DPI にして再試行してください。'
+  } finally {
     isExporting.value = false
-    return
   }
-  drawPage(context, size.width, size.height, {
-    template: selectedTemplate.value,
-    backgroundColor: selectedBackgroundColor.value,
-    image: artwork.value,
-    pageNumber: pageNumber.value,
-    printedDate: printedDate.value,
-    zoom: imageZoom.value / 100,
-    offsetX: imageX.value,
-    offsetY: imageY.value,
-    showGuide: false,
-    textOffsets: currentTextOffsets.value,
-    artOffset: currentArtOffset.value,
-    artSize: currentArtSize.value,
-  })
-  const link = document.createElement('a')
-  link.download = `doujin-page-${exportSize.value.toLowerCase()}-${exportDpi.value}dpi.png`
-  link.href = canvas.toDataURL('image/png')
-  link.click()
-  isExporting.value = false
 }
 onBeforeUnmount(() => {
   if (objectUrl) URL.revokeObjectURL(objectUrl)
@@ -481,6 +519,9 @@ onBeforeUnmount(() => {
         {{ isExporting ? '書き出し中...' : 'PNGを書き出す' }} <span>↗</span>
       </button>
     </header>
+    <p v-if="exportError" class="export-error" role="alert">
+      {{ exportError }}
+    </p>
     <main class="workspace">
       <aside class="sidebar">
         <section class="panel section-upload">
@@ -489,7 +530,7 @@ onBeforeUnmount(() => {
             ref="fileInput"
             class="sr-only"
             type="file"
-            accept="image/*"
+            accept="image/jpeg,image/png,image/webp"
             @change="onFileChange"
           />
           <button
@@ -514,6 +555,7 @@ onBeforeUnmount(() => {
           <p v-if="imageError" class="image-error" role="alert">
             {{ imageError }}
           </p>
+          <p class="privacy-note">画像は端末内で処理され、送信されません。</p>
         </section>
         <section class="panel">
           <div class="section-label"><span>02</span> レイアウト</div>

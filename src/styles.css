@@ -78,6 +78,14 @@ button {
   margin-left: 10px;
   font-size: 17px;
 }
+.export-error {
+  margin: 0;
+  padding: 10px 24px;
+  border-bottom: 1px solid #b42d18;
+  color: #8d2414;
+  background: #fff2ec;
+  font-size: 12px;
+}
 .workspace {
   display: grid;
   grid-template-columns: 365px minmax(0, 1fr);
@@ -150,6 +158,11 @@ button {
 .image-error {
   color: #b42d18;
   font-size: 12px;
+}
+.privacy-note {
+  margin: 10px 0 0;
+  color: #77736a;
+  font-size: 11px;
 }
 .drop-active {
   outline: 3px solid #f15132;

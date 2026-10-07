@@ -1,20 +1,46 @@
-# fanzine-generator
+# 同人誌レイアウトジェネレーター
 
-同人誌のレイアウトを自動作成するアプリケーション
+画像を配置して同人誌のページを PNG で作成する、Vue と Vite の静的アプリです。画像の読み込み・編集・書き出しはブラウザー内で完結し、画像をサーバーへ送信しません。サーバーや API キーは不要です。
 
 ## 開発
 
-`npm install` で依存関係を取得し、`npm run dev` で開発サーバーを起動します。
+Node.js 24 と npm を使用します。
 
-## コードチェック・整形
+```sh
+npm ci
+npm run dev
+```
 
-- `npm run lint` — JavaScript・TypeScript・Vueのエラーを検査
-- `npm run lint:fix` — ESLintで自動修正可能な問題を修正
-- `npm run typecheck` — TypeScript・Vueの型を検査
-- `npm run format` — Prettierでコードを整形
-- `npm run format:check` — 整形済みか検査（ファイル変更なし）
-- `npm run build` — 本番ビルド
+`npm run lint` でコードを検査し、`npm run build` で型検査と本番ビルドを行います。生成物は `dist/` です。`npm run preview` で生成物をローカル確認できます。
 
-ESLintはJavaScriptの推奨ルールとVueの必須ルールを使用します。TypeScriptは7系の`tsc`、Vueは互換性のある6系の`vue-tsc`で型を検査します。整形はPrettierが担当します。
+## GitHub Pages
 
-Prettierはセミコロンなし・シングルクォートで、それ以外は標準設定です。
+Vite は相対パスでアセットを生成するため、リポジトリ配下の URL でも配信できます。GitHub Pages の公開設定と自動デプロイは未設定です。
+
+## Cloudflare Pages
+
+Git リポジトリを Pages に接続し、次の設定を指定します。
+
+| 設定                   | 値                 |
+| ---------------------- | ------------------ |
+| Framework preset       | Vue または None    |
+| Production branch      | `main`             |
+| Build command          | `npm run build`    |
+| Build output directory | `dist`             |
+| Root directory         | リポジトリのルート |
+
+`.nvmrc` で Node.js 24 を指定しています。`public/_headers` はビルド時に `dist/` へコピーされ、Cloudflare Pages でセキュリティヘッダーとハッシュ付きアセットの長期キャッシュを設定します。GitHub Pages は `_headers` に対応しません。
+
+## 公開時の動作
+
+- 対応画像は JPG・PNG・WebP、30 MB 以下、3000 万画素以下です。SVG は読み込みません。
+- PNG は端末側で生成します。大きな画像や 300 DPI の書き出しには端末のメモリが必要です。失敗した場合は 150 DPI を試せます。
+- CSS は Google Fonts を読み込みます。画像データは送信しませんが、フォント取得の通信は発生します。
+- URL に編集状態や画像は保存されません。ページを再読み込みすると編集内容は消えます。
+
+## その他のコマンド
+
+- `npm run lint:fix` — ESLint の自動修正
+- `npm run typecheck` — TypeScript・Vue の型検査
+- `npm run format` — Prettier による整形
+- `npm run format:check` — 整形の検査
