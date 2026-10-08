@@ -23,6 +23,9 @@ import {
 } from './lib/pageRenderer'
 
 const previewCanvas = ref<HTMLCanvasElement | null>(null)
+const templateGrid = ref<HTMLDivElement | null>(null)
+const canScrollLayoutsLeft = ref(false)
+const canScrollLayoutsRight = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 const artwork = ref<HTMLImageElement | null>(null)
 const artworkName = ref('画像をアップロード')
@@ -118,6 +121,25 @@ function renderPreview() {
   })
 }
 
+function updateLayoutScrollState() {
+  const grid = templateGrid.value
+  if (!grid) return
+  canScrollLayoutsLeft.value = grid.scrollLeft > 1
+  canScrollLayoutsRight.value =
+    grid.scrollLeft < grid.scrollWidth - grid.clientWidth - 1
+}
+
+function scrollLayouts(direction: -1 | 1) {
+  const grid = templateGrid.value
+  if (!grid || grid.children.length < 2) return
+  const first = grid.children[0] as HTMLElement
+  const second = grid.children[1] as HTMLElement
+  grid.scrollBy({
+    left: direction * (second.offsetLeft - first.offsetLeft),
+    behavior: 'smooth',
+  })
+}
+
 watch(
   [
     activeTemplate,
@@ -140,7 +162,9 @@ watch(
 )
 onMounted(() => {
   renderPreview()
+  updateLayoutScrollState()
   window.addEventListener('resize', renderPreview)
+  window.addEventListener('resize', updateLayoutScrollState)
   window.addEventListener('dragover', preventFileNavigation)
   window.addEventListener('drop', preventFileNavigation)
 })
@@ -509,6 +533,7 @@ onBeforeUnmount(() => {
   if (objectUrl) URL.revokeObjectURL(objectUrl)
   objectUrl = null
   window.removeEventListener('resize', renderPreview)
+  window.removeEventListener('resize', updateLayoutScrollState)
   window.removeEventListener('dragover', preventFileNavigation)
   window.removeEventListener('drop', preventFileNavigation)
 })
@@ -562,18 +587,51 @@ onBeforeUnmount(() => {
         </section>
         <section class="panel">
           <div class="section-label"><span>02</span> レイアウト</div>
-          <div class="template-grid">
+          <div
+            id="layout-options"
+            ref="templateGrid"
+            class="template-grid"
+            role="group"
+            aria-label="横にスクロールできるレイアウト一覧"
+            tabindex="0"
+            @scroll.passive="updateLayoutScrollState"
+          >
             <button
               v-for="template in templates"
               :key="template.id"
               class="template-card"
               :class="{ selected: activeTemplate === template.id }"
+              :aria-pressed="activeTemplate === template.id"
               @click="activeTemplate = template.id"
             >
               <span class="mini-page" :class="`mini-${template.id}`"
                 ><i></i><b></b><em></em></span
               ><strong>{{ template.name }}</strong>
             </button>
+          </div>
+          <div class="layout-scroll-controls">
+            <div class="layout-scroll-buttons">
+              <button
+                type="button"
+                aria-label="左にスクロールして前のレイアウトを見る"
+                title="左にスクロールして前のレイアウトを見る"
+                aria-controls="layout-options"
+                :disabled="!canScrollLayoutsLeft"
+                @click="scrollLayouts(-1)"
+              >
+                ←
+              </button>
+              <button
+                type="button"
+                aria-label="右にスクロールして次のレイアウトを見る"
+                title="右にスクロールして次のレイアウトを見る"
+                aria-controls="layout-options"
+                :disabled="!canScrollLayoutsRight"
+                @click="scrollLayouts(1)"
+              >
+                →
+              </button>
+            </div>
           </div>
           <label class="background-color-control">
             <span>背景色</span>
