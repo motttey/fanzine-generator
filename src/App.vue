@@ -73,6 +73,9 @@ const selectedBackgroundColor = computed({
   },
 })
 const selectedPaper = computed(() => paperSizes[exportSize.value])
+const targetPreviewWidth = computed(
+  () => `${(80 * selectedPaper.value.width) / selectedPaper.value.height}vh`,
+)
 const currentTextOffsets = computed(
   () => textOffsets.value[activeTemplate.value] ?? {},
 )
@@ -640,7 +643,10 @@ onBeforeUnmount(() => {
           </p>
         </section>
       </aside>
-      <section class="canvas-area">
+      <section
+        class="canvas-area"
+        :style="{ '--page-target-width': targetPreviewWidth }"
+      >
         <div class="canvas-meta">
           <span>PAGE {{ String(pageNumber).padStart(2, '0') }}</span
           ><span>{{ selectedTemplate.name }}</span>
