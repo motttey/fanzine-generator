@@ -11,6 +11,8 @@ import type {
   TextRegion,
 } from '../@types/generator'
 
+const pageFontFamily = "'Noto Sans JP', sans-serif"
+
 export const paperSizes: PaperSizes = {
   A5: { width: 148, height: 210, label: '148 × 210 mm' },
   B5: { width: 182, height: 257, label: '182 × 257 mm' },
@@ -87,10 +89,10 @@ function fitText(
   initial: number,
 ): number {
   let size = initial
-  ctx.font = `700 ${size}px 'DM Mono', monospace`
+  ctx.font = `700 ${size}px ${pageFontFamily}`
   while (ctx.measureText(text).width > maxWidth && size > 5) {
     size -= 0.5
-    ctx.font = `700 ${size}px 'DM Mono', monospace`
+    ctx.font = `700 ${size}px ${pageFontFamily}`
   }
   return size
 }
@@ -262,7 +264,7 @@ export function drawPage(
       String(pageNumber).padStart(2, '0'),
       x + u * 1.8,
       y - u * 1.8,
-      `700 ${numberSize}px 'DM Mono', monospace`,
+      `700 ${numberSize}px ${pageFontFamily}`,
       'left',
       lightInk ? '#fffefa' : '#292926',
       dateOffset,
@@ -273,7 +275,7 @@ export function drawPage(
       printedDate || 'YYYY-MM-DD',
       x + u * 1.8,
       y + u * 2,
-      `400 ${u * 1.65}px 'DM Mono', monospace`,
+      `400 ${u * 1.65}px ${pageFontFamily}`,
       'left',
       lightInk ? '#fffefa' : '#292926',
       dateOffset,
@@ -321,7 +323,7 @@ export function drawPage(
         String(pageNumber),
         width / 2,
         height - u * 4.2,
-        `700 ${u * 2.1}px 'DM Mono', monospace`,
+        `700 ${u * 2.1}px ${pageFontFamily}`,
         'center',
         lightInk ? '#fffefa' : '#20201e',
         textOffsets.footerNumber,
@@ -337,7 +339,7 @@ export function drawPage(
         String(pageNumber).padStart(2, '0'),
         width - u * 5,
         height - u * 4.5,
-        `700 ${u * 2.1}px 'DM Mono', monospace`,
+        `700 ${u * 2.1}px ${pageFontFamily}`,
         'right',
         image || lightInk ? '#fffefa' : '#20201e',
         textOffsets.overNumber,

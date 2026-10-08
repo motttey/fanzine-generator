@@ -1,6 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap');
 :root {
-  font-family: 'Zen Kaku Gothic New', sans-serif;
+  font-family: 'Noto Sans JP', sans-serif;
   color: #262624;
   background: #ebe8df;
   font-synthesis: none;
@@ -110,7 +110,7 @@ button {
   display: inline-block;
   margin-right: 9px;
   color: #f15132;
-  font-family: 'DM Mono', monospace;
+  font-family: 'Noto Sans JP', sans-serif;
   font-size: 11px;
 }
 .upload-zone {
@@ -138,13 +138,13 @@ button {
 .upload-zone small {
   margin-top: 5px;
   color: #817d73;
-  font-family: 'DM Mono', monospace;
+  font-family: 'Noto Sans JP', sans-serif;
   font-size: 10px;
 }
 .upload-icon {
   margin-bottom: 4px;
   color: #f15132;
-  font-family: 'DM Mono', monospace;
+  font-family: 'Noto Sans JP', sans-serif;
   font-size: 26px;
   line-height: 1;
 }
@@ -302,7 +302,7 @@ button {
 }
 .background-color-control output {
   color: #626057;
-  font-family: 'DM Mono', monospace;
+  font-family: 'Noto Sans JP', sans-serif;
   font-size: 11px;
   font-weight: 400;
 }
@@ -319,7 +319,7 @@ button {
 }
 .controls output {
   color: #f15132;
-  font-family: 'DM Mono', monospace;
+  font-family: 'Noto Sans JP', sans-serif;
   font-size: 11px;
 }
 .controls input {
@@ -349,7 +349,7 @@ select {
   color: #252523;
   outline-color: #f15132;
   background: #fffefa;
-  font-family: 'DM Mono', monospace;
+  font-family: 'Noto Sans JP', sans-serif;
   font-size: 12px;
 }
 .reset-text {
@@ -369,7 +369,7 @@ select {
 .export-settings p {
   margin: 12px 0 0;
   color: #77736b;
-  font-family: 'DM Mono', monospace;
+  font-family: 'Noto Sans JP', sans-serif;
   font-size: 10px;
 }
 .canvas-area {
@@ -391,7 +391,7 @@ select {
   justify-content: space-between;
   margin-bottom: 12px;
   color: #77736a;
-  font-family: 'DM Mono', monospace;
+  font-family: 'Noto Sans JP', sans-serif;
   font-size: 11px;
 }
 .preview-wrap {
@@ -428,7 +428,7 @@ select {
 }
 .empty-state div {
   color: #f15132;
-  font-family: 'DM Mono', monospace;
+  font-family: 'Noto Sans JP', sans-serif;
   font-size: 30px;
 }
 .empty-state strong {
