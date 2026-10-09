@@ -32,7 +32,14 @@ const artworkName = ref('画像をアップロード')
 const activeTemplate = ref<TemplateId>('calendar')
 const backgroundColors = ref<BackgroundColors>({})
 const pageNumber = ref(23)
-const printedDate = ref('2022-09-25')
+const today = new Date()
+const printedDate = ref(
+  [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, '0'),
+    String(today.getDate()).padStart(2, '0'),
+  ].join('-'),
+)
 const imageZoom = ref(100)
 const imageX = ref(0)
 const imageY = ref(0)
@@ -666,12 +673,7 @@ onBeforeUnmount(() => {
               min="1"
               max="999"
           /></label>
-          <label
-            >日付<input
-              v-model="printedDate"
-              type="text"
-              placeholder="YYYY-MM-DD"
-          /></label>
+          <label>日付<input v-model="printedDate" type="date" /></label>
           <button class="reset-text" @click="resetTextPositions">
             文字の位置を戻す
           </button>
