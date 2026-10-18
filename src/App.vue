@@ -646,7 +646,7 @@ onBeforeUnmount(() => {
             <output>{{ selectedBackgroundColor.toUpperCase() }}</output>
           </label>
           <button class="reset-text" @click="resetArtFrame">
-            表示枠の位置・サイズを戻す
+            表示枠の位置をデフォルトに戻す
           </button>
         </section>
         <section class="panel controls">

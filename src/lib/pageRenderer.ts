@@ -116,11 +116,6 @@ function drawImageCover(
     gradient.addColorStop(1, '#d6d1c4')
     ctx.fillStyle = gradient
     ctx.fillRect(frame.x, frame.y, frame.w, frame.h)
-    ctx.strokeStyle = '#b6b0a2'
-    ctx.lineWidth = Math.max(1, frame.w / 260)
-    ctx.setLineDash([frame.w / 40, frame.w / 40])
-    ctx.strokeRect(frame.x + 1, frame.y + 1, frame.w - 2, frame.h - 2)
-    ctx.setLineDash([])
     return
   }
   const imageRatio = image.naturalWidth / image.naturalHeight
@@ -229,7 +224,7 @@ export function drawPage(
   const textRegions: TextRegion[] = []
   const page = { width, height }
 
-  if (template.id !== 'bleed') {
+  if (template.id !== 'bleed' && !showGuide) {
     ctx.strokeStyle = lightInk ? '#fffefa' : '#1e1e1b'
     ctx.lineWidth = Math.max(1, u * 0.13)
     ctx.strokeRect(frame.x, frame.y, frame.w, frame.h)
@@ -366,11 +361,9 @@ export function drawPage(
   if (showGuide) {
     ctx.save()
     ctx.strokeStyle = activeArtFrame ? '#f15132' : 'rgba(255, 89, 51, .85)'
-    ctx.setLineDash([u * 1, u * 0.7])
     ctx.lineWidth = Math.max(1, u * 0.15)
     ctx.strokeRect(frame.x, frame.y, frame.w, frame.h)
     const handle = getArtResizeHandle(frame, width)
-    ctx.setLineDash([])
     ctx.fillStyle = '#fffefa'
     ctx.fillRect(
       handle.x - handle.size / 2,
