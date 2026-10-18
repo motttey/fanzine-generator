@@ -549,7 +549,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="studio">
     <header class="topbar">
-      <a class="brand" href="#">同人誌レイアウト<span>ジェネレーター</span></a>
+      <div class="brand">同人誌レイアウト<span>ジェネレーター</span></div>
       <button class="export-button" :disabled="isExporting" @click="exportPng">
         {{ isExporting ? '書き出し中...' : 'PNGを書き出す' }} <span>↗</span>
       </button>
