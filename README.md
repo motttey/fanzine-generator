@@ -15,7 +15,9 @@ npm run dev
 
 ## GitHub Pages
 
-Vite は相対パスでアセットを生成するため、リポジトリ配下の URL でも配信できます。GitHub Pages の公開設定と自動デプロイは未設定です。
+リポジトリの **Settings → Pages → Build and deployment → Source** で **GitHub Actions** を選択します。`main` ブランチへの push、または Actions 画面からの手動実行で、`.github/workflows/deploy-pages.yml` が `dist/` をビルドして公開します。公開先は `https://motttey.github.io/fanzine-generator/` です。
+
+Vite は相対パスでアセットを生成するため、リポジトリ配下の URL でも配信できます。
 
 ## Cloudflare Pages
 
