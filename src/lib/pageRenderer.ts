@@ -12,6 +12,7 @@ import type {
 } from '../@types/generator'
 
 const pageFontFamily = "'Noto Sans JP', sans-serif"
+const accentColor = '#22b8cf'
 
 export const paperSizes: PaperSizes = {
   A5: { width: 148, height: 210, label: '148 × 210 mm' },
@@ -346,7 +347,7 @@ export function drawPage(
     const region = textRegions.find((item) => item.id === activeTextId)
     if (region) {
       ctx.save()
-      ctx.strokeStyle = '#f15132'
+      ctx.strokeStyle = accentColor
       ctx.lineWidth = Math.max(1, u * 0.2)
       ctx.setLineDash([u * 0.6, u * 0.45])
       ctx.strokeRect(
@@ -360,7 +361,7 @@ export function drawPage(
   }
   if (showGuide) {
     ctx.save()
-    ctx.strokeStyle = activeArtFrame ? '#f15132' : 'rgba(255, 89, 51, .85)'
+    ctx.strokeStyle = activeArtFrame ? accentColor : 'rgba(34, 184, 207, .85)'
     ctx.lineWidth = Math.max(1, u * 0.15)
     ctx.strokeRect(frame.x, frame.y, frame.w, frame.h)
     const handle = getArtResizeHandle(frame, width)
@@ -371,7 +372,7 @@ export function drawPage(
       handle.size,
       handle.size,
     )
-    ctx.strokeStyle = '#f15132'
+    ctx.strokeStyle = accentColor
     ctx.lineWidth = Math.max(2, u * 0.3)
     ctx.strokeRect(
       handle.x - handle.size / 2,
