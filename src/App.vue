@@ -695,6 +695,7 @@ onBeforeUnmount(() => {
               >DPI<select v-model.number="exportDpi">
                 <option :value="150">150</option>
                 <option :value="300">300</option>
+                <option :value="600">600</option>
               </select></label
             >
           </div>
