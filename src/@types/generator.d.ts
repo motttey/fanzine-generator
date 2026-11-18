@@ -140,6 +140,7 @@ export type DragStart =
 export interface DrawPageOptions {
   template: LayoutTemplate
   backgroundColor?: string
+  showBackgroundGradient: boolean
   image?: HTMLImageElement | null
   pageNumber: number
   printedDate: string

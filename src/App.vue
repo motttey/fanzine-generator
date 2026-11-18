@@ -31,6 +31,7 @@ const artwork = ref<HTMLImageElement | null>(null)
 const artworkName = ref('画像をアップロード')
 const activeTemplate = ref<TemplateId>('calendar')
 const backgroundColors = ref<BackgroundColors>({})
+const showBackgroundGradient = ref(true)
 const pageNumber = ref(23)
 const today = new Date()
 const printedDate = ref(
@@ -113,6 +114,7 @@ function renderPreview() {
   textRegions = drawPage(context, displayWidth, displayHeight, {
     template: selectedTemplate.value,
     backgroundColor: selectedBackgroundColor.value,
+    showBackgroundGradient: showBackgroundGradient.value,
     image: artwork.value,
     pageNumber: pageNumber.value,
     printedDate: printedDate.value,
@@ -151,6 +153,7 @@ watch(
   [
     activeTemplate,
     backgroundColors,
+    showBackgroundGradient,
     pageNumber,
     printedDate,
     imageZoom,
@@ -504,6 +507,7 @@ async function exportPng() {
     drawPage(context, size.width, size.height, {
       template: selectedTemplate.value,
       backgroundColor: selectedBackgroundColor.value,
+      showBackgroundGradient: showBackgroundGradient.value,
       image: artwork.value,
       pageNumber: pageNumber.value,
       printedDate: printedDate.value,
@@ -644,6 +648,10 @@ onBeforeUnmount(() => {
             <span>背景色</span>
             <input v-model="selectedBackgroundColor" type="color" />
             <output>{{ selectedBackgroundColor.toUpperCase() }}</output>
+          </label>
+          <label class="background-gradient-control">
+            <input v-model="showBackgroundGradient" type="checkbox" />
+            <span>背景グラデーションを表示</span>
           </label>
           <button class="reset-text" @click="resetArtFrame">
             表示枠の位置をデフォルトに戻す

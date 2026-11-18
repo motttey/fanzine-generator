@@ -196,6 +196,7 @@ export function drawPage(
   const {
     template,
     backgroundColor = template.backgroundColor,
+    showBackgroundGradient,
     image,
     pageNumber,
     printedDate,
@@ -229,7 +230,8 @@ export function drawPage(
     ctx.strokeStyle = lightInk ? '#fffefa' : '#1e1e1b'
     ctx.lineWidth = Math.max(1, u * 0.13)
     ctx.strokeRect(frame.x, frame.y, frame.w, frame.h)
-  } else if (image) {
+  }
+  if (image && showBackgroundGradient) {
     const shade = ctx.createLinearGradient(0, 0, 0, height)
     shade.addColorStop(0.6, 'transparent')
     shade.addColorStop(1, 'rgba(0,0,0,.55)')
