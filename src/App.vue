@@ -35,7 +35,7 @@ const artwork = ref<HTMLImageElement | null>(null)
 const artworkName = ref('画像をアップロード')
 const activeTemplate = ref<TemplateId>('calendar')
 const backgroundColors = ref<BackgroundColors>({})
-const showBackgroundGradient = ref(true)
+const showBackgroundGradient = ref(false)
 const pageNumber = ref(23)
 const today = new Date()
 const printedDate = ref(
@@ -677,15 +677,21 @@ onBeforeUnmount(() => {
               </button>
             </div>
           </div>
-          <label class="background-color-control">
-            <span>背景色</span>
-            <input v-model="selectedBackgroundColor" type="color" />
-            <output>{{ selectedBackgroundColor.toUpperCase() }}</output>
-          </label>
-          <label class="background-gradient-control">
-            <input v-model="showBackgroundGradient" type="checkbox" />
-            <span>背景グラデーションを表示</span>
-          </label>
+          <div class="background-controls">
+            <label class="background-color-control">
+              <span>背景色</span>
+              <input v-model="selectedBackgroundColor" type="color" />
+              <output>{{ selectedBackgroundColor.toUpperCase() }}</output>
+            </label>
+            <label class="background-gradient-control">
+              <input
+                v-model="showBackgroundGradient"
+                type="checkbox"
+                aria-label="背景グラデーションを表示"
+              />
+              <span>グラデーション</span>
+            </label>
+          </div>
           <button class="reset-text" @click="resetArtFrame">
             表示枠の位置をデフォルトに戻す
           </button>
