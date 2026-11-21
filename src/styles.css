@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap');
 :root {
   --accent-color: #22b8cf;
+  --bleed-guide-color: #dd4730;
   font-family: 'Noto Sans JP', sans-serif;
   color: #262624;
   background: #ebe8df;
@@ -417,6 +418,49 @@ select {
   color: #77736b;
   font-family: 'Noto Sans JP', sans-serif;
   font-size: 10px;
+  line-height: 1.8;
+}
+.bleed-control {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+  color: #555149;
+  font-size: 11px;
+  cursor: pointer;
+}
+.bleed-control input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent-color);
+}
+.bleed-control strong {
+  margin-left: auto;
+  color: #a52f1d;
+  font-size: 10px;
+}
+.bleed-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  max-width: 100%;
+  margin: 15px 0 0;
+  color: #a52f1d;
+  font-size: 11px;
+}
+.bleed-swatch {
+  flex: 0 0 24px;
+  height: 12px;
+  border: 1px dashed var(--bleed-guide-color);
+  background: repeating-linear-gradient(
+    135deg,
+    transparent 0 4px,
+    var(--bleed-guide-color) 4px 5px,
+    transparent 5px 9px
+  );
 }
 .canvas-area {
   display: flex;

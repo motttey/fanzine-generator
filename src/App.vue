@@ -9,15 +9,19 @@ import type {
   DragStart,
   DropTarget,
   LayoutElementId,
+  PageGeometry,
   PaperSizeId,
   TemplateId,
   TextOffsetsByTemplate,
   TextRegion,
 } from './@types/generator'
 import {
+  bleedWidthMm,
   drawPage,
   getArtFrame,
   getArtResizeHandle,
+  getPageGeometry,
+  getPageSize,
   paperSizes,
   templates,
 } from './lib/pageRenderer'
@@ -46,6 +50,7 @@ const imageX = ref(0)
 const imageY = ref(0)
 const exportSize = ref<PaperSizeId>('A5')
 const exportDpi = ref(300)
+const includeBleed = ref(true)
 const isDragging = ref(false)
 const draggingText = ref<LayoutElementId | null>(null)
 const hoveredText = ref<LayoutElementId | null>(null)
@@ -66,6 +71,12 @@ let dragStart: DragStart | null = null
 let textRegions: TextRegion[] = []
 let previewWidth = 0
 let previewHeight = 0
+let previewGeometry: PageGeometry = {
+  trimWidth: 0,
+  trimHeight: 0,
+  bleedX: 0,
+  bleedY: 0,
+}
 
 const selectedTemplate = computed(
   () =>
@@ -84,8 +95,11 @@ const selectedBackgroundColor = computed({
   },
 })
 const selectedPaper = computed(() => paperSizes[exportSize.value])
+const outputSize = computed(() =>
+  getPageSize(exportSize.value, includeBleed.value),
+)
 const targetPreviewWidth = computed(
-  () => `${(80 * selectedPaper.value.width) / selectedPaper.value.height}vh`,
+  () => `${(80 * outputSize.value.width) / outputSize.value.height}vh`,
 )
 const currentTextOffsets = computed(
   () => textOffsets.value[activeTemplate.value] ?? {},
@@ -99,20 +113,28 @@ function renderPreview() {
   const canvas = previewCanvas.value
   if (!canvas) return
   const bounds = canvas.getBoundingClientRect()
-  const ratio = selectedPaper.value.height / selectedPaper.value.width
+  const ratio = outputSize.value.height / outputSize.value.width
   const displayWidth = bounds.width || 480
   const displayHeight = displayWidth * ratio
   previewWidth = displayWidth
   previewHeight = displayHeight
+  previewGeometry = getPageGeometry(
+    displayWidth,
+    displayHeight,
+    exportSize.value,
+    includeBleed.value,
+  )
   const dpr = window.devicePixelRatio || 1
   canvas.width = Math.round(displayWidth * dpr)
   canvas.height = Math.round(displayHeight * dpr)
-  canvas.style.aspectRatio = `${selectedPaper.value.width} / ${selectedPaper.value.height}`
+  canvas.style.aspectRatio = `${outputSize.value.width} / ${outputSize.value.height}`
   const context = canvas.getContext('2d')
   if (!context) return
   context.scale(dpr, dpr)
   textRegions = drawPage(context, displayWidth, displayHeight, {
     template: selectedTemplate.value,
+    paperSize: exportSize.value,
+    includeBleed: includeBleed.value,
     backgroundColor: selectedBackgroundColor.value,
     showBackgroundGradient: showBackgroundGradient.value,
     image: artwork.value,
@@ -160,6 +182,7 @@ watch(
     imageX,
     imageY,
     exportSize,
+    includeBleed,
     artwork,
     textOffsets,
     artOffsets,
@@ -289,8 +312,12 @@ function pointerPosition(event: PointerEvent): CanvasPoint | null {
   ).getBoundingClientRect()
   if (!rect.width || !rect.height) return null
   return {
-    x: ((event.clientX - rect.left) * previewWidth) / rect.width,
-    y: ((event.clientY - rect.top) * previewHeight) / rect.height,
+    x:
+      ((event.clientX - rect.left) * previewWidth) / rect.width -
+      previewGeometry.bleedX,
+    y:
+      ((event.clientY - rect.top) * previewHeight) / rect.height -
+      previewGeometry.bleedY,
   }
 }
 function textAtPointer(position: CanvasPoint | null): TextRegion | null {
@@ -310,8 +337,8 @@ function textAtPointer(position: CanvasPoint | null): TextRegion | null {
 function currentArtFrame(): ArtFrame {
   return getArtFrame(
     selectedTemplate.value,
-    previewWidth,
-    previewHeight,
+    previewGeometry.trimWidth,
+    previewGeometry.trimHeight,
     currentArtOffset.value,
     currentArtSize.value,
   )
@@ -329,7 +356,7 @@ function artFrameAtPointer(position: CanvasPoint | null): ArtFrame | null {
 function resizeHandleAtPointer(position: CanvasPoint | null): ArtFrame | null {
   if (!position) return null
   const frame = currentArtFrame()
-  const handle = getArtResizeHandle(frame, previewWidth)
+  const handle = getArtResizeHandle(frame, previewGeometry.trimWidth)
   const hitRadius = Math.max(14, handle.size)
   return Math.abs(position.x - handle.x) <= hitRadius &&
     Math.abs(position.y - handle.y) <= hitRadius
@@ -394,12 +421,11 @@ function pointerMove(event: PointerEvent) {
   const rect = (
     event.currentTarget as HTMLCanvasElement
   ).getBoundingClientRect()
+  const { trimWidth: pageWidth, trimHeight: pageHeight } = previewGeometry
   if (dragStart.type === 'text') {
     const dx = ((event.clientX - dragStart.x) / rect.width) * previewWidth
     const dy = ((event.clientY - dragStart.y) / rect.height) * previewHeight
     const { bounds, offset, id } = dragStart
-    const pageWidth = previewWidth
-    const pageHeight = previewHeight
     const limitedX = Math.max(
       -bounds.x,
       Math.min(pageWidth - bounds.x - bounds.width, dx),
@@ -424,21 +450,21 @@ function pointerMove(event: PointerEvent) {
     const dx = ((event.clientX - dragStart.x) / rect.width) * previewWidth
     const dy = ((event.clientY - dragStart.y) / rect.height) * previewHeight
     const { frame } = dragStart
-    const maxWidth = previewWidth - frame.x
-    const maxHeight = previewHeight - frame.y
+    const maxWidth = pageWidth - frame.x
+    const maxHeight = pageHeight - frame.y
     const width = Math.max(
-      Math.min(previewWidth * 0.08, maxWidth),
+      Math.min(pageWidth * 0.08, maxWidth),
       Math.min(maxWidth, frame.w + dx),
     )
     const height = Math.max(
-      Math.min(previewHeight * 0.08, maxHeight),
+      Math.min(pageHeight * 0.08, maxHeight),
       Math.min(maxHeight, frame.h + dy),
     )
     artSizes.value = {
       ...artSizes.value,
       [activeTemplate.value]: {
-        w: (width / previewWidth) * 100,
-        h: (height / previewHeight) * 100,
+        w: (width / pageWidth) * 100,
+        h: (height / pageHeight) * 100,
       },
     }
     return
@@ -448,17 +474,17 @@ function pointerMove(event: PointerEvent) {
   const { frame, offset } = dragStart
   const limitedX = Math.max(
     -frame.x,
-    Math.min(previewWidth - frame.x - frame.w, dx),
+    Math.min(pageWidth - frame.x - frame.w, dx),
   )
   const limitedY = Math.max(
     -frame.y,
-    Math.min(previewHeight - frame.y - frame.h, dy),
+    Math.min(pageHeight - frame.y - frame.h, dy),
   )
   artOffsets.value = {
     ...artOffsets.value,
     [activeTemplate.value]: {
-      x: offset.x + (limitedX / previewWidth) * 100,
-      y: offset.y + (limitedY / previewHeight) * 100,
+      x: offset.x + (limitedX / pageWidth) * 100,
+      y: offset.y + (limitedY / pageHeight) * 100,
     },
   }
 }
@@ -481,9 +507,13 @@ function pointerLeave() {
   hoveredArtFrame.value = false
   hoveredResizeHandle.value = false
 }
-function canvasSizeForExport(paperSize: PaperSizeId, dpi: number) {
+function canvasSizeForExport(
+  paperSize: PaperSizeId,
+  dpi: number,
+  withBleed: boolean,
+) {
   const pixelsPerMm = dpi / 25.4
-  const paper = paperSizes[paperSize]
+  const paper = getPageSize(paperSize, withBleed)
   return {
     width: Math.round(paper.width * pixelsPerMm),
     height: Math.round(paper.height * pixelsPerMm),
@@ -498,7 +528,8 @@ async function exportPng() {
     await document.fonts.ready
     const paperSize = exportSize.value
     const dpi = exportDpi.value
-    const size = canvasSizeForExport(paperSize, dpi)
+    const withBleed = includeBleed.value
+    const size = canvasSizeForExport(paperSize, dpi, withBleed)
     const canvas = document.createElement('canvas')
     canvas.width = size.width
     canvas.height = size.height
@@ -506,6 +537,8 @@ async function exportPng() {
     if (!context) throw new Error('Canvas is unavailable')
     drawPage(context, size.width, size.height, {
       template: selectedTemplate.value,
+      paperSize,
+      includeBleed: withBleed,
       backgroundColor: selectedBackgroundColor.value,
       showBackgroundGradient: showBackgroundGradient.value,
       image: artwork.value,
@@ -527,7 +560,7 @@ async function exportPng() {
     })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
-    link.download = `doujin-page-${paperSize.toLowerCase()}-${dpi}dpi.png`
+    link.download = `doujin-page-${paperSize.toLowerCase()}-${dpi}dpi${withBleed ? '-bleed3mm' : ''}.png`
     link.href = url
     document.body.append(link)
     link.click()
@@ -707,8 +740,23 @@ onBeforeUnmount(() => {
               </select></label
             >
           </div>
+          <label class="bleed-control">
+            <input
+              v-model="includeBleed"
+              type="checkbox"
+              aria-describedby="bleed-description"
+            />
+            <span>断ち落とし（塗り足し）を追加</span>
+            <strong>四辺 {{ bleedWidthMm }} mm</strong>
+          </label>
+          <p id="bleed-description">
+            仕上がりの外側に背景・画像を延ばします。ガイド線は PNG
+            に含まれません。
+          </p>
           <p>
-            {{ selectedPaper.width }} × {{ selectedPaper.height }} mm ・ PNG
+            仕上がり {{ selectedPaper.width }} ×
+            {{ selectedPaper.height }} mm<br />
+            書き出し {{ outputSize.width }} × {{ outputSize.height }} mm ・ PNG
           </p>
         </section>
       </aside>
@@ -748,6 +796,10 @@ onBeforeUnmount(() => {
             ><button @click="chooseImage">画像を選ぶ</button>
           </div>
         </div>
+        <p v-if="includeBleed" class="bleed-legend">
+          <span class="bleed-swatch" aria-hidden="true"></span>
+          斜線：断ち落とし {{ bleedWidthMm }} mm ／ 破線：仕上がり位置
+        </p>
         <p class="drag-hint">
           画像表示枠の右下をドラッグするとサイズ変更、枠内と文字はドラッグで移動できます。
         </p>

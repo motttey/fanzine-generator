@@ -58,6 +58,13 @@ export interface PaperSize {
   label: string
 }
 
+export interface PageGeometry {
+  trimWidth: number
+  trimHeight: number
+  bleedX: number
+  bleedY: number
+}
+
 export type PaperSizes = Record<PaperSizeId, PaperSize>
 
 export interface LayoutTemplate {
@@ -99,6 +106,7 @@ export interface PageContent {
 export interface ExportSettings {
   size: PaperSizeId
   dpi: 150 | 300
+  includeBleed: boolean
 }
 
 export interface GeneratorState {
@@ -139,6 +147,8 @@ export type DragStart =
 
 export interface DrawPageOptions {
   template: LayoutTemplate
+  paperSize: PaperSizeId
+  includeBleed: boolean
   backgroundColor?: string
   showBackgroundGradient: boolean
   image?: HTMLImageElement | null

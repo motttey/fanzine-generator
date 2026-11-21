@@ -5,6 +5,8 @@ import type {
   CanvasTextAlign,
   DrawPageOptions,
   LayoutTemplate,
+  PageGeometry,
+  PaperSizeId,
   PaperSizes,
   PositionOffset,
   ResizeHandle,
@@ -13,11 +15,37 @@ import type {
 
 const pageFontFamily = "'Noto Sans JP', sans-serif"
 const accentColor = '#22b8cf'
+const bleedGuideColor = '#dd4730'
+export const bleedWidthMm = 3
 
 export const paperSizes: PaperSizes = {
   A5: { width: 148, height: 210, label: '148 × 210 mm' },
   B5: { width: 182, height: 257, label: '182 × 257 mm' },
   A4: { width: 210, height: 297, label: '210 × 297 mm' },
+}
+
+export function getPageSize(paperSize: PaperSizeId, includeBleed: boolean) {
+  const paper = paperSizes[paperSize]
+  const bleed = includeBleed ? bleedWidthMm : 0
+  return { width: paper.width + bleed * 2, height: paper.height + bleed * 2 }
+}
+
+export function getPageGeometry(
+  width: number,
+  height: number,
+  paperSize: PaperSizeId,
+  includeBleed: boolean,
+): PageGeometry {
+  const size = getPageSize(paperSize, includeBleed)
+  const bleed = includeBleed ? bleedWidthMm : 0
+  const bleedX = (width * bleed) / size.width
+  const bleedY = (height * bleed) / size.height
+  return {
+    trimWidth: width - bleedX * 2,
+    trimHeight: height - bleedY * 2,
+    bleedX,
+    bleedY,
+  }
 }
 
 export const templates: LayoutTemplate[] = [
@@ -67,7 +95,11 @@ export function getArtFrame(
     x: template.art.x * u + ((offset.x ?? 0) * width) / 100,
     y: template.art.y * u + ((offset.y ?? 0) * height) / 100,
     w: size ? (size.w * width) / 100 : template.art.w * u,
-    h: size ? (size.h * height) / 100 : template.art.h * u,
+    h: size
+      ? (size.h * height) / 100
+      : template.id === 'bleed'
+        ? height
+        : template.art.h * u,
   }
 }
 
@@ -187,14 +219,54 @@ function drawText(
   }
 }
 
-export function drawPage(
+function drawBleedGuide(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
+  bleedX: number,
+  bleedY: number,
+): void {
+  ctx.save()
+  ctx.beginPath()
+  ctx.rect(-bleedX, -bleedY, width + bleedX * 2, bleedY)
+  ctx.rect(-bleedX, height, width + bleedX * 2, bleedY)
+  ctx.rect(-bleedX, 0, bleedX, height)
+  ctx.rect(width, 0, bleedX, height)
+  ctx.clip()
+  ctx.fillStyle = 'rgba(221, 71, 48, .12)'
+  ctx.fillRect(-bleedX, -bleedY, width + bleedX * 2, height + bleedY * 2)
+  ctx.strokeStyle = bleedGuideColor
+  ctx.lineWidth = Math.max(1, width * 0.0015)
+  const spacing = width * 0.025
+  ctx.beginPath()
+  for (let x = -height - bleedY; x < width + bleedX; x += spacing) {
+    ctx.moveTo(x, -bleedY)
+    ctx.lineTo(x + height + bleedY * 2, height + bleedY)
+  }
+  ctx.stroke()
+  ctx.restore()
+
+  ctx.save()
+  ctx.lineWidth = Math.max(2, width * 0.003)
+  ctx.strokeStyle = '#ffffff'
+  ctx.strokeRect(0, 0, width, height)
+  ctx.strokeStyle = bleedGuideColor
+  ctx.lineWidth = Math.max(1, width * 0.0015)
+  ctx.setLineDash([width * 0.012, width * 0.008])
+  ctx.strokeRect(0, 0, width, height)
+  ctx.restore()
+}
+
+export function drawPage(
+  ctx: CanvasRenderingContext2D,
+  canvasWidth: number,
+  canvasHeight: number,
   options: DrawPageOptions,
 ): TextRegion[] {
   const {
     template,
+    paperSize,
+    includeBleed,
     backgroundColor = template.backgroundColor,
     showBackgroundGradient,
     image,
@@ -210,6 +282,12 @@ export function drawPage(
     artSize,
     activeArtFrame,
   } = options
+  const {
+    trimWidth: width,
+    trimHeight: height,
+    bleedX,
+    bleedY,
+  } = getPageGeometry(canvasWidth, canvasHeight, paperSize, includeBleed)
   const u = width / 100
   const red = Number.parseInt(backgroundColor.slice(1, 3), 16)
   const green = Number.parseInt(backgroundColor.slice(3, 5), 16)
@@ -217,11 +295,31 @@ export function drawPage(
   const backgroundBrightness = red * 0.299 + green * 0.587 + blue * 0.114
   const lightInk = backgroundBrightness < 150
   const frame = getArtFrame(template, width, height, artOffset, artSize)
-  ctx.clearRect(0, 0, width, height)
+  ctx.clearRect(0, 0, canvasWidth, canvasHeight)
+  ctx.save()
+  ctx.translate(bleedX, bleedY)
   ctx.fillStyle = backgroundColor
-  ctx.fillRect(0, 0, width, height)
+  ctx.fillRect(-bleedX, -bleedY, canvasWidth, canvasHeight)
   if (image || template.id !== 'bleed') {
-    drawImageCover(ctx, image, frame, zoom, offsetX, offsetY)
+    // Artwork touching a trim edge continues to the outside of the bleed.
+    const left = frame.x <= 0.01 ? Math.min(frame.x, -bleedX) : frame.x
+    const top = frame.y <= 0.01 ? Math.min(frame.y, -bleedY) : frame.y
+    const right =
+      frame.x + frame.w >= width - 0.01
+        ? Math.max(frame.x + frame.w, width + bleedX)
+        : frame.x + frame.w
+    const bottom =
+      frame.y + frame.h >= height - 0.01
+        ? Math.max(frame.y + frame.h, height + bleedY)
+        : frame.y + frame.h
+    drawImageCover(
+      ctx,
+      image,
+      { x: left, y: top, w: right - left, h: bottom - top },
+      zoom,
+      offsetX,
+      offsetY,
+    )
   }
   const textRegions: TextRegion[] = []
   const page = { width, height }
@@ -236,7 +334,7 @@ export function drawPage(
     shade.addColorStop(0.6, 'transparent')
     shade.addColorStop(1, 'rgba(0,0,0,.55)')
     ctx.fillStyle = shade
-    ctx.fillRect(0, 0, width, height)
+    ctx.fillRect(-bleedX, -bleedY, canvasWidth, canvasHeight)
   }
 
   if (template.date) {
@@ -384,5 +482,9 @@ export function drawPage(
     )
     ctx.restore()
   }
+  if (showGuide && includeBleed) {
+    drawBleedGuide(ctx, width, height, bleedX, bleedY)
+  }
+  ctx.restore()
   return textRegions
 }
