@@ -51,23 +51,15 @@ export function getPageGeometry(
 export const templates: LayoutTemplate[] = [
   {
     id: 'calendar',
-    name: '作品カレンダー',
+    name: '中央に画像配置',
     backgroundColor: '#fffefa',
     art: { x: 10.5, y: 20, w: 79, h: 57 },
     date: true,
     number: 'bottom',
   },
   {
-    id: 'gallery',
-    name: '余白ギャラリー',
-    backgroundColor: '#fffefa',
-    art: { x: 13, y: 12, w: 74, h: 68 },
-    date: false,
-    number: 'bottom',
-  },
-  {
     id: 'bleed',
-    name: 'フルブリード',
+    name: '画面全体',
     backgroundColor: '#ffffff',
     art: { x: 0, y: 0, w: 100, h: 100 },
     date: false,
