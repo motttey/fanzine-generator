@@ -1,4 +1,4 @@
-export type TemplateId = 'calendar' | 'gallery' | 'bleed' | 'postcard'
+export type TemplateId = 'calendar' | 'bleed' | 'postcard'
 export type PaperSizeId = 'A5' | 'B5' | 'A4'
 export type LayoutElementId = 'dateBlock' | 'footerNumber' | 'overNumber'
 export type DropTarget = 'upload' | 'preview'

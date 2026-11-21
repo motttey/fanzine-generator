@@ -584,232 +584,224 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="studio">
-    <header class="topbar">
-      <div class="brand">同人誌レイアウト<span>ジェネレーター</span></div>
-      <button class="export-button" :disabled="isExporting" @click="exportPng">
-        {{ isExporting ? '書き出し中...' : 'PNGを書き出す' }} <span>↗</span>
-      </button>
-    </header>
-    <p v-if="exportError" class="export-error" role="alert">
-      {{ exportError }}
-    </p>
-    <main class="workspace">
-      <aside class="sidebar">
-        <section class="panel section-upload">
-          <div class="section-label"><span>01</span> 画像</div>
-          <input
-            ref="fileInput"
-            class="sr-only"
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            @change="onFileChange"
-          />
-          <button
-            class="upload-zone"
-            :class="{ 'drop-active': dropTarget === 'upload' }"
-            @click="chooseImage"
-            @dragover="onDragOver($event, 'upload')"
-            @dragleave="onDragLeave"
-            @drop="onDrop"
-          >
-            <span class="upload-icon">↥</span
-            ><strong>{{
-              artwork ? '画像を差し替える' : '画像をアップロード'
-            }}</strong
-            ><small>{{ artwork ? artworkName : 'JPG / PNG / WebP' }}</small>
-            <small>画像をドラッグ＆ドロップ、またはクリック</small>
-          </button>
-          <div v-if="artwork" class="image-actions">
-            <span>{{ artworkName }}</span
-            ><button @click="resetImage">位置を戻す</button>
-          </div>
-          <p v-if="imageError" class="image-error" role="alert">
-            {{ imageError }}
-          </p>
-          <p class="privacy-note">画像は端末内で処理され、送信されません。</p>
-        </section>
-        <section class="panel">
-          <div class="section-label"><span>02</span> レイアウト</div>
-          <div
-            id="layout-options"
-            ref="templateGrid"
-            class="template-grid"
-            role="group"
-            aria-label="横にスクロールできるレイアウト一覧"
-            tabindex="0"
-            @scroll.passive="updateLayoutScrollState"
-          >
-            <button
-              v-for="template in templates"
-              :key="template.id"
-              class="template-card"
-              :class="{ selected: activeTemplate === template.id }"
-              :aria-pressed="activeTemplate === template.id"
-              @click="activeTemplate = template.id"
-            >
-              <span class="mini-page" :class="`mini-${template.id}`"
-                ><i></i><b></b><em></em></span
-              ><strong>{{ template.name }}</strong>
-            </button>
-          </div>
-          <div class="layout-scroll-controls">
-            <div class="layout-scroll-buttons">
-              <button
-                type="button"
-                aria-label="左にスクロールして前のレイアウトを見る"
-                title="左にスクロールして前のレイアウトを見る"
-                aria-controls="layout-options"
-                :disabled="!canScrollLayoutsLeft"
-                @click="scrollLayouts(-1)"
-              >
-                ←
-              </button>
-              <button
-                type="button"
-                aria-label="右にスクロールして次のレイアウトを見る"
-                title="右にスクロールして次のレイアウトを見る"
-                aria-controls="layout-options"
-                :disabled="!canScrollLayoutsRight"
-                @click="scrollLayouts(1)"
-              >
-                →
-              </button>
-            </div>
-          </div>
-          <div class="background-controls">
-            <label class="background-color-control">
-              <span>背景色</span>
-              <input v-model="selectedBackgroundColor" type="color" />
-              <output>{{ selectedBackgroundColor.toUpperCase() }}</output>
-            </label>
-            <label class="background-gradient-control">
-              <input
-                v-model="showBackgroundGradient"
-                type="checkbox"
-                aria-label="背景グラデーションを表示"
-              />
-              <span>グラデーション</span>
-            </label>
-          </div>
-          <button class="reset-text" @click="resetArtFrame">
-            表示枠の位置をデフォルトに戻す
-          </button>
-        </section>
-        <section class="panel controls">
-          <div class="section-label"><span>03</span> 調整</div>
-          <label
-            >拡大・縮小 <output>{{ imageZoom }}%</output
-            ><input v-model.number="imageZoom" type="range" min="100" max="180"
-          /></label>
-          <label
-            >横位置 <output>{{ Math.round(imageX) }}</output
-            ><input v-model.number="imageX" type="range" min="-100" max="100"
-          /></label>
-          <label
-            >縦位置 <output>{{ Math.round(imageY) }}</output
-            ><input v-model.number="imageY" type="range" min="-100" max="100"
-          /></label>
-        </section>
-        <section class="panel text-fields">
-          <div class="section-label"><span>04</span> 文字</div>
-          <label
-            >ページ番号<input
-              v-model.number="pageNumber"
-              type="number"
-              min="1"
-              max="999"
-          /></label>
-          <label>日付<input v-model="printedDate" type="date" /></label>
-          <button class="reset-text" @click="resetTextPositions">
-            文字の位置を戻す
-          </button>
-        </section>
-        <section class="panel export-settings">
-          <div class="section-label"><span>05</span> 書き出し設定</div>
-          <div class="select-row">
-            <label
-              >仕上がり<select v-model="exportSize">
-                <option
-                  v-for="(size, key) in paperSizes"
-                  :key="key"
-                  :value="key"
-                >
-                  {{ key }}（{{ size.label }}）
-                </option>
-              </select></label
-            ><label
-              >DPI<select v-model.number="exportDpi">
-                <option :value="150">150</option>
-                <option :value="300">300</option>
-                <option :value="600">600</option>
-              </select></label
-            >
-          </div>
-          <label class="bleed-control">
-            <input
-              v-model="includeBleed"
-              type="checkbox"
-              aria-describedby="bleed-description"
-            />
-            <span>断ち落とし（塗り足し）を追加</span>
-            <strong>四辺 {{ bleedWidthMm }} mm</strong>
-          </label>
-          <p id="bleed-description">
-            仕上がりの外側に背景・画像を延ばします。ガイド線は PNG
-            に含まれません。
-          </p>
-          <p>
-            仕上がり {{ selectedPaper.width }} ×
-            {{ selectedPaper.height }} mm<br />
-            書き出し {{ outputSize.width }} × {{ outputSize.height }} mm ・ PNG
-          </p>
-        </section>
-      </aside>
-      <section
-        class="canvas-area"
-        :style="{ '--page-target-width': targetPreviewWidth }"
-      >
-        <div class="canvas-meta">
-          <span>PAGE {{ String(pageNumber).padStart(2, '0') }}</span
-          ><span>{{ selectedTemplate.name }}</span>
-        </div>
-        <div
-          class="preview-wrap"
-          :class="{ 'drop-active': dropTarget === 'preview' }"
-          @dragover="onDragOver($event, 'preview')"
+  <header class="topbar">
+    <div class="brand">同人誌レイアウト<span>ジェネレーター</span></div>
+    <button class="export-button" :disabled="isExporting" @click="exportPng">
+      {{ isExporting ? '書き出し中...' : 'PNGを書き出す' }} <span>↗</span>
+    </button>
+  </header>
+  <p v-if="exportError" class="export-error" role="alert">
+    {{ exportError }}
+  </p>
+  <main class="workspace">
+    <aside class="sidebar">
+      <section>
+        <h2><span>01</span> 画像</h2>
+        <input
+          ref="fileInput"
+          hidden
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          @change="onFileChange"
+        />
+        <button
+          class="upload-zone"
+          :class="{ 'drop-active': dropTarget === 'upload' }"
+          @click="chooseImage"
+          @dragover="onDragOver($event, 'upload')"
           @dragleave="onDragLeave"
           @drop="onDrop"
         >
-          <canvas
-            ref="previewCanvas"
-            class="page-canvas"
-            :class="{
-              draggable: hoveredArtFrame || hoveredText,
-              dragging: isDragging,
-              resizing: hoveredResizeHandle,
-            }"
-            @pointerdown="pointerDown"
-            @pointermove="pointerMove"
-            @pointerup="pointerUp"
-            @pointercancel="pointerUp"
-            @pointerleave="pointerLeave"
-          ></canvas>
-          <div v-if="!artwork" class="empty-state">
-            <div>＋</div>
-            <strong>ここに作品画像を置く</strong
-            ><span>画像をドラッグ＆ドロップして読み込めます</span
-            ><button @click="chooseImage">画像を選ぶ</button>
-          </div>
+          <span class="upload-icon">↥</span
+          ><strong>{{
+            artwork ? '画像を差し替える' : '画像をアップロード'
+          }}</strong
+          ><small>{{ artwork ? artworkName : 'JPG / PNG / WebP' }}</small>
+          <small>画像をドラッグ＆ドロップ、またはクリック</small>
+        </button>
+        <div v-if="artwork" class="image-actions">
+          <span>{{ artworkName }}</span
+          ><button class="text-button" @click="resetImage">位置を戻す</button>
         </div>
-        <p v-if="includeBleed" class="bleed-legend">
-          <span class="bleed-swatch" aria-hidden="true"></span>
-          斜線：断ち落とし {{ bleedWidthMm }} mm ／ 破線：仕上がり位置
+        <p v-if="imageError" class="image-error" role="alert">
+          {{ imageError }}
         </p>
-        <p class="drag-hint">
-          画像表示枠の右下をドラッグするとサイズ変更、枠内と文字はドラッグで移動できます。
+        <p class="privacy-note">画像は端末内で処理され、送信されません。</p>
+      </section>
+      <section>
+        <h2><span>02</span> レイアウト</h2>
+        <div
+          id="layout-options"
+          ref="templateGrid"
+          class="template-grid"
+          role="group"
+          aria-label="横にスクロールできるレイアウト一覧"
+          tabindex="0"
+          @scroll.passive="updateLayoutScrollState"
+        >
+          <button
+            v-for="template in templates"
+            :key="template.id"
+            class="template-card"
+            :aria-pressed="activeTemplate === template.id"
+            @click="activeTemplate = template.id"
+          >
+            <span
+              class="template-preview"
+              :data-template="template.id"
+              aria-hidden="true"
+              ><span v-if="template.date"></span></span
+            ><strong>{{ template.name }}</strong>
+          </button>
+        </div>
+        <div class="layout-scroll-controls">
+          <button
+            type="button"
+            aria-label="左にスクロールして前のレイアウトを見る"
+            title="左にスクロールして前のレイアウトを見る"
+            aria-controls="layout-options"
+            :disabled="!canScrollLayoutsLeft"
+            @click="scrollLayouts(-1)"
+          >
+            ←
+          </button>
+          <button
+            type="button"
+            aria-label="右にスクロールして次のレイアウトを見る"
+            title="右にスクロールして次のレイアウトを見る"
+            aria-controls="layout-options"
+            :disabled="!canScrollLayoutsRight"
+            @click="scrollLayouts(1)"
+          >
+            →
+          </button>
+        </div>
+        <div class="background-controls">
+          <label class="background-color">
+            背景色
+            <input v-model="selectedBackgroundColor" type="color" />
+            <output>{{ selectedBackgroundColor.toUpperCase() }}</output>
+          </label>
+          <label class="checkbox-control">
+            <input
+              v-model="showBackgroundGradient"
+              type="checkbox"
+              aria-label="背景グラデーションを表示"
+            />
+            グラデーション
+          </label>
+        </div>
+        <button class="text-button" @click="resetArtFrame">
+          表示枠の位置をデフォルトに戻す
+        </button>
+      </section>
+      <section class="image-controls">
+        <h2><span>03</span> 調整</h2>
+        <label
+          >拡大・縮小 <output>{{ imageZoom }}%</output
+          ><input v-model.number="imageZoom" type="range" min="100" max="180"
+        /></label>
+        <label
+          >横位置 <output>{{ Math.round(imageX) }}</output
+          ><input v-model.number="imageX" type="range" min="-100" max="100"
+        /></label>
+        <label
+          >縦位置 <output>{{ Math.round(imageY) }}</output
+          ><input v-model.number="imageY" type="range" min="-100" max="100"
+        /></label>
+      </section>
+      <section class="text-fields">
+        <h2><span>04</span> 文字</h2>
+        <label
+          >ページ番号<input
+            v-model.number="pageNumber"
+            type="number"
+            min="1"
+            max="999"
+        /></label>
+        <label>日付<input v-model="printedDate" type="date" /></label>
+        <button class="text-button" @click="resetTextPositions">
+          文字の位置を戻す
+        </button>
+      </section>
+      <section class="export-settings">
+        <h2><span>05</span> 書き出し設定</h2>
+        <div class="select-row">
+          <label
+            >仕上がり<select v-model="exportSize">
+              <option v-for="(size, key) in paperSizes" :key="key" :value="key">
+                {{ key }}（{{ size.label }}）
+              </option>
+            </select></label
+          ><label
+            >DPI<select v-model.number="exportDpi">
+              <option :value="150">150</option>
+              <option :value="300">300</option>
+              <option :value="600">600</option>
+            </select></label
+          >
+        </div>
+        <label class="checkbox-control">
+          <input
+            v-model="includeBleed"
+            type="checkbox"
+            aria-describedby="bleed-description"
+          />
+          断ち落とし（塗り足し）を追加
+          <strong>四辺 {{ bleedWidthMm }} mm</strong>
+        </label>
+        <p id="bleed-description">
+          仕上がりの外側に背景・画像を延ばします。ガイド線は PNG
+          に含まれません。
+        </p>
+        <p>
+          仕上がり {{ selectedPaper.width }} ×
+          {{ selectedPaper.height }} mm<br />
+          書き出し {{ outputSize.width }} × {{ outputSize.height }} mm ・ PNG
         </p>
       </section>
-    </main>
-  </div>
+    </aside>
+    <section
+      class="canvas-area"
+      :style="{ '--page-target-width': targetPreviewWidth }"
+    >
+      <div class="canvas-meta">
+        <span>PAGE {{ String(pageNumber).padStart(2, '0') }}</span
+        ><span>{{ selectedTemplate.name }}</span>
+      </div>
+      <div
+        class="preview-wrap"
+        :class="{ 'drop-active': dropTarget === 'preview' }"
+        @dragover="onDragOver($event, 'preview')"
+        @dragleave="onDragLeave"
+        @drop="onDrop"
+      >
+        <canvas
+          ref="previewCanvas"
+          class="page-canvas"
+          :class="{
+            draggable: hoveredArtFrame || hoveredText,
+            dragging: isDragging,
+            resizing: hoveredResizeHandle,
+          }"
+          @pointerdown="pointerDown"
+          @pointermove="pointerMove"
+          @pointerup="pointerUp"
+          @pointercancel="pointerUp"
+          @pointerleave="pointerLeave"
+        ></canvas>
+        <div v-if="!artwork" class="empty-state">
+          <strong>ここに作品画像を置く</strong
+          ><span>画像をドラッグ＆ドロップして読み込めます</span
+          ><button @click="chooseImage">画像を選ぶ</button>
+        </div>
+      </div>
+      <p v-if="includeBleed" class="bleed-legend">
+        斜線：断ち落とし {{ bleedWidthMm }} mm ／ 破線：仕上がり位置
+      </p>
+      <p class="drag-hint">
+        画像表示枠の右下をドラッグするとサイズ変更、枠内と文字はドラッグで移動できます。
+      </p>
+    </section>
+  </main>
 </template>
